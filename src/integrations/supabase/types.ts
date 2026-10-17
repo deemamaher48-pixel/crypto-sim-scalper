@@ -101,6 +101,36 @@ export type Database = {
         }
         Relationships: []
       }
+      paper_services: {
+        Row: {
+          enabled: boolean
+          last_message: string
+          last_tick_at: string | null
+          lease_token: string | null
+          lease_until: string | null
+          state: Json
+          user_id: string
+        }
+        Insert: {
+          enabled?: boolean
+          last_message?: string
+          last_tick_at?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          state?: Json
+          user_id: string
+        }
+        Update: {
+          enabled?: boolean
+          last_message?: string
+          last_tick_at?: string | null
+          lease_token?: string | null
+          lease_until?: string | null
+          state?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           closed_at: string | null
@@ -163,7 +193,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_paper_service: {
+        Args: { p_token: string; p_user: string }
+        Returns: boolean
+      }
+      commit_paper_service: {
+        Args: {
+          p_message: string
+          p_state: Json
+          p_tick: boolean
+          p_token: string
+          p_user: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

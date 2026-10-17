@@ -16,5 +16,6 @@
 - Chart and paper-mode prices come from the live Binance public API (Testnet mode decides on Testnet prices to match its fills); paper balances live in bot_settings — user wants real prices with simulated trading.
 - API credentials table has no client grants; only server functions read it via admin client — secrets never reach the browser.
 - Background bot: a managed schedule calls /api/public/jobs/bot-tick every minute, ticking every enabled account; a unique open-trade index prevents duplicate buys from overlapping ticks.
-- Home page runs a guest futures-style paper engine in the browser (src/hooks/use-local-paper.ts, localStorage); the signed-in server bot trades Long and Short in paper mode (futures-style margin) and stays long-only in Testnet because Testnet spot cannot short.
+- Home uses the local paper engine only for guests; authenticated home uses durable paper_services state and the shared background-paper pure engine, with leased transactional state/history commits — closed tabs cannot stop trading or double-book balances.
+- A paper_services account is excluded from legacy bot ticks; permanent account trade history is never deleted by a balance reset — avoids competing engines and keeps absence records intact.
 - Shared PriceChart preserves the visible time range on price updates and separates drag-to-pan from explicit zoom controls — prevents live updates and gestures from unexpectedly changing zoom.

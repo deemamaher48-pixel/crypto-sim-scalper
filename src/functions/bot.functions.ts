@@ -160,6 +160,8 @@ export const runBotTick = createServerFn({ method: "POST" })
 
 /** One bot step for one user. Called by the open dashboard and by the background job. */
 export async function tickUser(userId: string) {
+    const { data: service } = await (await admin()).from("paper_services").select("user_id").eq("user_id",userId).maybeSingle();
+    if (service) return {action:"idle" as const,message:"البوت الخلفي يُدار من الصفحة الرئيسية"};
     const { data: settings } = await (await admin()).from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
     if (!settings) return { action: "idle" as const, message: "احفظ الإعدادات أولاً" };
     const paper = settings.mode !== "testnet";
@@ -302,8 +304,10 @@ export async function tickUser(userId: string) {
 export const resetPaperAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const db = await admin();
-    await db.from("trades").delete().eq("user_id", context.userId).eq("mode", "paper");
+    const { data: open } = await context.supabase.from("trades").select("id").eq("status","open").limit(1);
+    if(open?.length) throw new Error("أغلق الصفقة قبل إعادة ضبط الرصيد");
+    const {data:service}=await context.supabase.from("paper_services").select("user_id").maybeSingle();
+    if(service) throw new Error("سجل البوت الدائم محفوظ ولا يُحذف بإعادة الضبط");
     await context.supabase
       .from("bot_settings")
       .update({ paper_usdt: 10000, paper_btc: 0, enabled: false })
@@ -315,6 +319,15 @@ export const closeTradeNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: { tradeId: string }) => ({ tradeId: String(i.tradeId) }))
   .handler(async ({ data, context }) => {
+    const { data: service } = await context.supabase.from("paper_services").select("state").eq("user_id",context.userId).maybeSingle();
+    if(service){
+      const state=service.state as {trades?: {id:string;closedAt?:string;pnl?:number;exit?:number}[]};
+      if(!state.trades?.some(t=>t.id===data.tradeId&&!t.closedAt))throw new Error("الصفقة غير موجودة");
+      const {tickBackgroundUser}=await import("@/functions/background.functions");
+      const result=await tickBackgroundUser(context.userId,"close");
+      const trade=result.state.trades.find(t=>t.id===data.tradeId);
+      return {pnl:trade?.pnl??0,exitPrice:trade?.exit??0};
+    }
     const db = await admin();
     const { data: trade } = await db
       .from("trades")

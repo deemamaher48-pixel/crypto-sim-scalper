@@ -22,6 +22,7 @@ export type LocalSettings = StrategyParams & {
 };
 export type LocalExit = "stop_loss" | "take_profit" | "ema_cross" | "manual" | "time_stop" | "vwap_break" | "trailing";
 export type LocalTrade = {
+  symbol?: "BTCUSDT" | "PAXGUSDT";
   id: string;
   side: Side;
   size: number; // USDT margin/notional
@@ -62,7 +63,7 @@ const DEFAULT: State = {
 
 export type BotStatus = { tone: "off" | "watch" | "blocked" | "open" | "ready"; text: string };
 
-export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, klines1: Kline[] = []) {
+export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, klines1: Kline[] = [], active = true) {
   const rollover = (ms: number) => gold && inRolloverWindow(ms);
   const [st, setSt] = useState<State>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
@@ -88,8 +89,8 @@ export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, 
     setLoaded(true);
   }, []);
   useEffect(() => {
-    if (loaded) localStorage.setItem(KEY, JSON.stringify(st));
-  }, [st, loaded]);
+    if (loaded && active) localStorage.setItem(KEY, JSON.stringify(st));
+  }, [st, loaded, active]);
 
   const price = klines.at(-1)?.close ?? 0;
   const closedCount = klines.length - 1;
@@ -208,7 +209,7 @@ export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, 
 
   // Stop / TP1 / TP2 checked on every live price update; also track the best price for the time-stop.
   useEffect(() => {
-    if (!loaded || !open || !price) return;
+    if (!active || !loaded || !open || !price) return;
     const d = open.side === "long" ? 1 : -1;
     if (d * (price - open.stop) <= 0) return close("stop_loss", price);
     if (d * (price - open.target) >= 0) return close("take_profit", price);
@@ -222,11 +223,11 @@ export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, 
     }
     if (open.best == null || d * (price - open.best) > 0)
       setSt((s) => ({ ...s, trades: s.trades.map((x) => (x.id === open.id ? { ...x, best: price } : x)) }));
-  }, [price, open?.id, open?.tp1Hit, loaded]);
+  }, [price, open?.id, open?.tp1Hit, loaded, active]);
 
   // Entries and candle-close exits: once per closed 5m candle.
   useEffect(() => {
-    if (!loaded || !price || !closedBars.length) return;
+    if (!active || !loaded || !price || !closedBars.length) return;
     const candleTime = closedBars.at(-1)!.time;
     if (candleTime === lastCandle.current) return;
     lastCandle.current = candleTime;
@@ -240,7 +241,7 @@ export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, 
     }
     if (!st.enabled || breakerOn || !signal?.side || !gate().ok || rollover(Date.now()) || cooling(Date.now())) return;
     openTrade(signal.side, signal.reason);
-  }, [closedCount, signal, loaded, st.enabled, sniper]);
+  }, [closedCount, signal, loaded, st.enabled, sniper, active]);
 
   return {
     ...st,

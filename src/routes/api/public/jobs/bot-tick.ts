@@ -10,14 +10,21 @@ export const Route = createFileRoute("/api/public/jobs/bot-tick")({
         if (authFailure) return authFailure;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { tickUser } = await import("@/functions/bot.functions");
+        const { tickBackgroundUser } = await import("@/functions/background.functions");
+        const { data: services, error: serviceError } = await supabaseAdmin.from("paper_services").select("user_id,enabled,state");
+        if (serviceError) throw serviceError;
         const [{ data: enabled }, { data: open }] = await Promise.all([
           supabaseAdmin.from("bot_settings").select("user_id").eq("enabled", true),
           supabaseAdmin.from("trades").select("user_id").eq("status", "open"),
         ]);
-        const users = [...new Set([...(enabled ?? []), ...(open ?? [])].map((r) => r.user_id))];
-        const results = await Promise.allSettled(users.map((u) => tickUser(u)));
+        const managed = new Set((services ?? []).map(s => s.user_id));
+        const users = [...new Set([...(enabled ?? []), ...(open ?? [])].map((r) => r.user_id))].filter(u => !managed.has(u));
+        const active = (services ?? []).filter(s => s.enabled || (s.state as { trades?: { closedAt?: string }[] }).trades?.some(t => !t.closedAt));
+        const tasks = [...users.map(u => () => tickUser(u)), ...active.map(s => () => tickBackgroundUser(s.user_id))];
+        const results: PromiseSettledResult<unknown>[] = [];
+        for (const task of tasks) results.push(...await Promise.allSettled([task()]));
         const failed = results.filter((r) => r.status === "rejected").length;
-        return Response.json({ users: users.length, failed });
+        return Response.json({ users: tasks.length, failed });
       },
     },
   },
