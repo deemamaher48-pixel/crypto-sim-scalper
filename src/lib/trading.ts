@@ -131,3 +131,17 @@ export function floorToStep(qty: number, step: number): number {
   const v = Math.floor(qty / step + 1e-9) * step;
   return Number(v.toFixed(decimals));
 }
+
+export const PAPER_FEE = 0.001; // 0.1% per side, like Binance spot
+
+/** Simulated market buy of `sizeUsdt` at `price`; entry is the fee-inclusive cost basis. */
+export function paperBuy(sizeUsdt: number, price: number) {
+  const qty = (sizeUsdt / price) * (1 - PAPER_FEE);
+  return { qty, entry: sizeUsdt / qty };
+}
+
+/** Simulated market sell; pnl is net of both fees. */
+export function paperSell(qty: number, entry: number, price: number) {
+  const proceeds = qty * price * (1 - PAPER_FEE);
+  return { proceeds, pnl: proceeds - entry * qty };
+}
