@@ -155,7 +155,7 @@ function Dashboard() {
             <Switch checked={s.enabled} onCheckedChange={(v) => toggle.mutate(v)} aria-label="تشغيل البوت" />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            {paper ? "وضع المحاكاة: أسعار حقيقية ورصيد افتراضي." : "وضع Testnet: أوامر على Binance Testnet."} يعمل البوت طالما هذه الصفحة مفتوحة.
+            {paper ? "وضع المحاكاة: أسعار حقيقية ورصيد افتراضي." : "وضع Testnet: أوامر على Binance Testnet."} يعمل البوت على الخادم كل دقيقة حتى لو أغلقت الصفحة.
           </p>
           <div className="mt-3 rounded-md bg-muted px-3 py-2 text-sm">
             الإشارة الحالية:{" "}

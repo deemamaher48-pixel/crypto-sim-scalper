@@ -225,10 +225,6 @@ export async function tickUser(userId: string) {
     if (paper) {
       qty = (size / price) * (1 - PAPER_FEE);
       entry = size / qty; // fee-inclusive cost basis
-      await db
-        .from("bot_settings")
-        .update({ paper_usdt: freeUsdt - size, paper_btc: Number(settings.paper_btc) + qty })
-        .eq("user_id", userId);
     } else {
       const order = await signedRequest<OrderResult>(creds!, "POST", "/api/v3/order", {
         symbol: settings.symbol,
@@ -246,7 +242,7 @@ export async function tickUser(userId: string) {
       qty = execQty - fee;
     }
     const b = bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
-    await db.from("trades").insert({
+    const { error: insErr } = await db.from("trades").insert({
       user_id: userId,
       symbol: settings.symbol,
       mode: paper ? "paper" : "testnet",
@@ -256,6 +252,13 @@ export async function tickUser(userId: string) {
       target_price: b.target,
       entry_reason: sig.reason,
     });
+    // Unique open-trade index rejects a duplicate when the page and background job tick together.
+    if (insErr) return { action: "hold" as const, price, ind, message: "صفقة مفتوحة بالفعل" };
+    if (paper)
+      await db
+        .from("bot_settings")
+        .update({ paper_usdt: freeUsdt - size, paper_btc: Number(settings.paper_btc) + qty })
+        .eq("user_id", userId);
     return { action: "buy" as const, price, ind, message: `شراء عند ${price.toFixed(2)} — ${sig.reason}` };
 }
 
