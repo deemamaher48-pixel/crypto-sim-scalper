@@ -5,3 +5,4 @@
 - [x] Chart & prices from the real live Binance market; only trades/balances simulated
 - [x] Home page = live chart + dashboard + bot + paper balance, no login (local paper engine)
 - [x] Server background bot via scheduled job (runs with page closed) for signed-in accounts
+- [ ] Home: precise bot status badge, instant test buy button, fast scalping mode
