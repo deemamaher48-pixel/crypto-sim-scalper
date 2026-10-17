@@ -95,7 +95,7 @@ function TradesPage() {
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b">
-                {["الوقت", "الوضع", "الدخول", "الخروج", "الكمية", "الربح", "سبب الدخول", "سبب الخروج"].map((h) => (
+                {["الوقت", "الوضع", "الاتجاه", "الدخول", "الخروج", "الكمية", "الربح", "سبب الدخول", "سبب الخروج"].map((h) => (
                   <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>
                 ))}
               </tr>
@@ -105,6 +105,7 @@ function TradesPage() {
                 <tr key={t.id} className="border-b last:border-0 hover:bg-accent/40">
                   <td className="num px-3 py-2 text-xs">{new Date(t.opened_at).toLocaleString("en-GB")}</td>
                   <td className="px-3 py-2 text-xs">{t.mode === "paper" ? "محاكاة" : "Testnet"}</td>
+                  <td className={`px-3 py-2 text-xs ${t.side === "short" ? "text-bear" : "text-bull"}`}>{t.side === "short" ? "Short" : "Long"}</td>
                   <td className="num px-3 py-2">{fmt(t.entry_price)}</td>
                   <td className="num px-3 py-2">{fmt(t.exit_price)}</td>
                   <td className="num px-3 py-2">{fmt(t.qty, 5)}</td>

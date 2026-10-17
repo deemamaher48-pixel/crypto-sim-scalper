@@ -14,10 +14,14 @@ import {
   exitCheck,
   floorToStep,
   riskGate,
-  paperBuy,
-  paperSell as paperSellCalc,
   type ExitReason,
   type StrategyParams,
+  type Side,
+  computeExtras,
+  twoWaySignal,
+  sideBracket,
+  sideExit,
+  sidePnl,
 } from "@/lib/trading";
 
 type Creds = { apiKey: string; apiSecret: string };
@@ -98,6 +102,7 @@ type TradeRow = {
   entry_price: number;
   stop_price: number;
   target_price: number;
+  side?: string;
 };
 
 async function sellTrade(userId: string, creds: Creds, trade: TradeRow, reason: ExitReason) {
@@ -136,12 +141,12 @@ async function sellTrade(userId: string, creds: Creds, trade: TradeRow, reason: 
 async function paperSell(userId: string, trade: TradeRow, price: number, reason: ExitReason) {
   const db = await admin();
   const qty = Number(trade.qty);
-  const { proceeds, pnl } = paperSellCalc(qty, Number(trade.entry_price), price);
-  const { data: s } = await db.from("bot_settings").select("paper_usdt, paper_btc").eq("user_id", userId).single();
-  await db
-    .from("bot_settings")
-    .update({ paper_usdt: Number(s!.paper_usdt) + proceeds, paper_btc: Math.max(0, Number(s!.paper_btc) - qty) })
-    .eq("user_id", userId);
+  const entry = Number(trade.entry_price);
+  const side: Side = trade.side === "short" ? "short" : "long";
+  // Futures-style paper margin: entry notional was reserved at open; return it plus net PnL.
+  const pnl = sidePnl(side, qty, entry, price);
+  const { data: s } = await db.from("bot_settings").select("paper_usdt").eq("user_id", userId).single();
+  await db.from("bot_settings").update({ paper_usdt: Number(s!.paper_usdt) + qty * entry + pnl }).eq("user_id", userId);
   await db
     .from("trades")
     .update({ status: "closed", exit_price: price, pnl, exit_reason: reason, closed_at: new Date().toISOString() })
@@ -173,18 +178,21 @@ export async function tickUser(userId: string) {
     const price = klines[klines.length - 1]!.close;
     const closed = klines.slice(0, -1).map((k) => k.close); // signals use closed candles only
     const ind = computeIndicators(closed, params);
+    const extras = computeExtras(klines.slice(0, -1));
 
     const db = await admin();
     const { data: open } = await db
       .from("trades")
-      .select("id, symbol, qty, entry_price, stop_price, target_price")
+      .select("id, symbol, qty, entry_price, stop_price, target_price, side")
       .eq("user_id", userId)
       .eq("status", "open")
       .limit(1)
       .maybeSingle();
 
     if (open) {
-      const reason = exitCheck(price, open, ind);
+      const reason = paper
+        ? sideExit(price, { side: open.side === "short" ? "short" : "long", stop: Number(open.stop_price), target: Number(open.target_price) }, ind)
+        : exitCheck(price, open, ind);
       if (reason) {
         const r = paper ? await paperSell(userId, open, price, reason) : await sellTrade(userId, creds!, open, reason);
         return { action: "sell" as const, price, ind, message: `تم الإغلاق: ${r.pnl.toFixed(2)} USDT` };
@@ -195,8 +203,20 @@ export async function tickUser(userId: string) {
     if (!settings.enabled) return { action: "idle" as const, price, ind, message: "البوت متوقف" };
     if (!ind) return { action: "idle" as const, price, ind, message: "بيانات غير كافية للمؤشرات" };
 
-    const sig = entrySignal(ind, params);
-    if (!sig.buy) return { action: "wait" as const, price, ind, message: sig.reason };
+    // Paper mode trades both directions; Testnet spot cannot short, so it stays long-only.
+    let side: Side = "long";
+    let reasonText: string;
+    if (paper) {
+      if (!extras) return { action: "idle" as const, price, ind, message: "بيانات غير كافية للمؤشرات" };
+      const sig = twoWaySignal(ind, extras, params, false);
+      if (!sig.side) return { action: "wait" as const, price, ind, message: sig.reason };
+      side = sig.side;
+      reasonText = sig.reason;
+    } else {
+      const sig = entrySignal(ind, params);
+      if (!sig.buy) return { action: "wait" as const, price, ind, message: sig.reason };
+      reasonText = sig.reason;
+    }
 
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
@@ -223,7 +243,8 @@ export async function tickUser(userId: string) {
     let qty: number;
     let entry: number;
     if (paper) {
-      ({ qty, entry } = paperBuy(size, price));
+      qty = size / price;
+      entry = price;
     } else {
       const order = await signedRequest<OrderResult>(creds!, "POST", "/api/v3/order", {
         symbol: settings.symbol,
@@ -240,7 +261,9 @@ export async function tickUser(userId: string) {
       entry = Number(order.cummulativeQuoteQty) / execQty;
       qty = execQty - fee;
     }
-    const b = bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
+    const b = paper
+      ? sideBracket(side, price, { atr: extras?.atr ?? null, slMult: 1.5, tpMult: 2.5, slPct: Number(settings.stop_loss_pct), tpPct: Number(settings.take_profit_pct) })
+      : bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
     const { error: insErr } = await db.from("trades").insert({
       user_id: userId,
       symbol: settings.symbol,
@@ -249,16 +272,18 @@ export async function tickUser(userId: string) {
       entry_price: entry,
       stop_price: b.stop,
       target_price: b.target,
-      entry_reason: sig.reason,
+      entry_reason: reasonText,
+      side,
     });
     // Unique open-trade index rejects a duplicate when the page and background job tick together.
     if (insErr) return { action: "hold" as const, price, ind, message: "صفقة مفتوحة بالفعل" };
     if (paper)
       await db
         .from("bot_settings")
-        .update({ paper_usdt: freeUsdt - size, paper_btc: Number(settings.paper_btc) + qty })
+        .update({ paper_usdt: freeUsdt - size })
         .eq("user_id", userId);
-    return { action: "buy" as const, price, ind, message: `شراء عند ${price.toFixed(2)} — ${sig.reason}` };
+    const label = side === "short" ? "بيع Short" : "شراء Long";
+    return { action: "buy" as const, price, ind, message: `${label} عند ${price.toFixed(2)} — ${reasonText}` };
 }
 
 export const resetPaperAccount = createServerFn({ method: "POST" })
@@ -280,7 +305,7 @@ export const closeTradeNow = createServerFn({ method: "POST" })
     const db = await admin();
     const { data: trade } = await db
       .from("trades")
-      .select("id, symbol, qty, entry_price, stop_price, target_price, mode")
+      .select("id, symbol, qty, entry_price, stop_price, target_price, mode, side")
       .eq("id", data.tradeId)
       .eq("user_id", context.userId)
       .eq("status", "open")
