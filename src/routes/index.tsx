@@ -233,6 +233,7 @@ const toneCls = {
 } as const;
 
 function IndicatorsPanel({ x }: { x: ReturnType<typeof useLocalPaper>["extras"] }) {
+  const [open, setOpen] = useState(false);
   if (!x) return null;
   const trending = x.adx >= 20;
   const items: { group: string; label: string; value: string; note: string; cls?: string }[] = [
