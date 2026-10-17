@@ -130,18 +130,35 @@ async function sellTrade(userId: string, creds: Creds, trade: TradeRow, reason: 
   return { exitPrice, pnl };
 }
 
+const PAPER_FEE = 0.001; // 0.1% like Binance spot
+
+async function paperSell(userId: string, trade: TradeRow, price: number, reason: ExitReason) {
+  const db = await admin();
+  const qty = Number(trade.qty);
+  const proceeds = qty * price * (1 - PAPER_FEE);
+  const pnl = proceeds - Number(trade.entry_price) * qty;
+  const { data: s } = await db.from("bot_settings").select("paper_usdt, paper_btc").eq("user_id", userId).single();
+  await db
+    .from("bot_settings")
+    .update({ paper_usdt: Number(s!.paper_usdt) + proceeds, paper_btc: Math.max(0, Number(s!.paper_btc) - qty) })
+    .eq("user_id", userId);
+  await db
+    .from("trades")
+    .update({ status: "closed", exit_price: price, pnl, exit_reason: reason, closed_at: new Date().toISOString() })
+    .eq("id", trade.id)
+    .eq("user_id", userId);
+  return { exitPrice: price, pnl };
+}
+
 export const runBotTick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const { data: settings } = await supabase
-      .from("bot_settings")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const { data: settings } = await supabase.from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
     if (!settings) return { action: "idle" as const, message: "احفظ الإعدادات أولاً" };
-    const creds = await loadCreds(userId);
-    if (!creds) return { action: "idle" as const, message: "أضف مفاتيح API من الإعدادات" };
+    const paper = settings.mode !== "testnet";
+    const creds = paper ? null : await loadCreds(userId);
+    if (!paper && !creds) return { action: "idle" as const, message: "أضف مفاتيح Testnet من الإعدادات أو بدّل للمحاكاة" };
 
     const params: StrategyParams = {
       emaFast: settings.ema_fast,
@@ -150,7 +167,7 @@ export const runBotTick = createServerFn({ method: "POST" })
       rsiOverbought: Number(settings.rsi_overbought),
       rsiOversold: Number(settings.rsi_oversold),
     };
-    const klines = await fetchKlines(settings.symbol, settings.interval, 200);
+    const klines = await fetchKlines(settings.symbol, settings.interval, 200, paper ? "live" : "testnet");
     const price = klines[klines.length - 1].close;
     const closed = klines.slice(0, -1).map((k) => k.close); // signals use closed candles only
     const ind = computeIndicators(closed, params);
@@ -167,7 +184,7 @@ export const runBotTick = createServerFn({ method: "POST" })
     if (open) {
       const reason = exitCheck(price, open, ind);
       if (reason) {
-        const r = await sellTrade(userId, creds, open, reason);
+        const r = paper ? await paperSell(userId, open, price, reason) : await sellTrade(userId, creds!, open, reason);
         return { action: "sell" as const, price, ind, message: `تم الإغلاق: ${r.pnl.toFixed(2)} USDT` };
       }
       return { action: "hold" as const, price, ind, message: "الصفقة مفتوحة — مراقبة الوقف والهدف" };
@@ -186,7 +203,9 @@ export const runBotTick = createServerFn({ method: "POST" })
       .select("pnl")
       .eq("user_id", userId)
       .gte("opened_at", startOfDay.toISOString());
-    const balances = await getBalances(creds);
+    const freeUsdt = paper
+      ? Number(settings.paper_usdt)
+      : Number((await getBalances(creds!)).find((b) => b.asset === "USDT")?.free ?? 0);
     const gate = riskGate({
       hasOpenTrade: false,
       tradesToday: today?.length ?? 0,
@@ -194,50 +213,80 @@ export const runBotTick = createServerFn({ method: "POST" })
       pnlToday: (today ?? []).reduce((s, t) => s + Number(t.pnl ?? 0), 0),
       maxDailyLossUsdt: Number(settings.max_daily_loss_usdt),
       positionUsdt: Number(settings.position_usdt),
-      freeUsdt: Number(balances.find((b) => b.asset === "USDT")?.free ?? 0),
+      freeUsdt,
     });
     if (!gate.ok) return { action: "blocked" as const, price, ind, message: gate.reason };
 
-    const order = await signedRequest<OrderResult>(creds, "POST", "/api/v3/order", {
-      symbol: settings.symbol,
-      side: "BUY",
-      type: "MARKET",
-      quoteOrderQty: Number(settings.position_usdt).toFixed(2),
-      newOrderRespType: "FULL",
-    });
-    const base = settings.symbol.replace(/USDT$/, "");
-    const fee = (order.fills ?? [])
-      .filter((f) => f.commissionAsset === base)
-      .reduce((s, f) => s + Number(f.commission), 0);
-    const execQty = Number(order.executedQty);
-    const entry = Number(order.cummulativeQuoteQty) / execQty;
-    const b = bracket(entry, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
+    const size = Number(settings.position_usdt);
+    let qty: number;
+    let entry: number;
+    if (paper) {
+      qty = (size / price) * (1 - PAPER_FEE);
+      entry = size / qty; // fee-inclusive cost basis
+      await db
+        .from("bot_settings")
+        .update({ paper_usdt: freeUsdt - size, paper_btc: Number(settings.paper_btc) + qty })
+        .eq("user_id", userId);
+    } else {
+      const order = await signedRequest<OrderResult>(creds!, "POST", "/api/v3/order", {
+        symbol: settings.symbol,
+        side: "BUY",
+        type: "MARKET",
+        quoteOrderQty: size.toFixed(2),
+        newOrderRespType: "FULL",
+      });
+      const base = settings.symbol.replace(/USDT$/, "");
+      const fee = (order.fills ?? [])
+        .filter((f) => f.commissionAsset === base)
+        .reduce((s, f) => s + Number(f.commission), 0);
+      const execQty = Number(order.executedQty);
+      entry = Number(order.cummulativeQuoteQty) / execQty;
+      qty = execQty - fee;
+    }
+    const b = bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
     await db.from("trades").insert({
       user_id: userId,
       symbol: settings.symbol,
-      qty: execQty - fee,
+      mode: paper ? "paper" : "testnet",
+      qty,
       entry_price: entry,
       stop_price: b.stop,
       target_price: b.target,
       entry_reason: sig.reason,
     });
-    return { action: "buy" as const, price, ind, message: `شراء عند ${entry.toFixed(2)} — ${sig.reason}` };
+    return { action: "buy" as const, price, ind, message: `شراء عند ${price.toFixed(2)} — ${sig.reason}` };
+  });
+
+export const resetPaperAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await admin();
+    await db.from("trades").delete().eq("user_id", context.userId).eq("mode", "paper");
+    await context.supabase
+      .from("bot_settings")
+      .update({ paper_usdt: 10000, paper_btc: 0, enabled: false })
+      .eq("user_id", context.userId);
+    return { ok: true };
   });
 
 export const closeTradeNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: { tradeId: string }) => ({ tradeId: String(i.tradeId) }))
   .handler(async ({ data, context }) => {
-    const creds = await loadCreds(context.userId);
-    if (!creds) throw new Error("أضف مفاتيح API أولاً");
     const db = await admin();
     const { data: trade } = await db
       .from("trades")
-      .select("id, symbol, qty, entry_price, stop_price, target_price")
+      .select("id, symbol, qty, entry_price, stop_price, target_price, mode")
       .eq("id", data.tradeId)
       .eq("user_id", context.userId)
       .eq("status", "open")
       .maybeSingle();
     if (!trade) throw new Error("الصفقة غير موجودة");
+    if (trade.mode === "paper") {
+      const k = await fetchKlines(trade.symbol, "1m", 1, "live");
+      return paperSell(context.userId, trade, k[0].close, "manual");
+    }
+    const creds = await loadCreds(context.userId);
+    if (!creds) throw new Error("أضف مفاتيح API أولاً");
     return sellTrade(context.userId, creds, trade, "manual");
   });

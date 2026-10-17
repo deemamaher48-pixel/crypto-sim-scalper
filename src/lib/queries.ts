@@ -19,6 +19,9 @@ export const DEFAULT_SETTINGS: Omit<Settings, "user_id" | "updated_at"> = {
   max_trades_per_day: 20,
   max_daily_loss_usdt: 25,
   enabled: false,
+  mode: "paper",
+  paper_usdt: 10000,
+  paper_btc: 0,
 };
 
 export const settingsQuery = queryOptions({
