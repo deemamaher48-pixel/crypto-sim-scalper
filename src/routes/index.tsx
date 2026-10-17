@@ -70,11 +70,6 @@ function Home() {
                     title={open && sym !== v ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
                     onClick={() => setSym(v)}>{l}</Button>
                 ))}
-                <Button size="sm" variant={bot.sniper ? "default" : "outline"} disabled={!!open}
-                  title={open ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
-                  onClick={() => bot.setSniper(!bot.sniper)}>
-                  صفقات سكالب على فريم الدقيقة: {bot.sniper ? "ON" : "OFF"}
-                </Button>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {gold ? "الذهب XAU/USD" : "BTC/USDT"} · {bot.sniper ? "1m (فلتر 5m)" : "5m (فلتر 15m)"}
@@ -147,6 +142,14 @@ function Home() {
               <Switch checked={bot.enabled} onCheckedChange={bot.setEnabled} aria-label="تشغيل البوت" />
             </div>
             <StatusBadge tone={bot.status.tone} text={bot.status.text} />
+            <Button
+              size="sm" variant={bot.sniper ? "default" : "outline"} className="mt-3 w-full" disabled={!!open}
+              title={open ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
+              onClick={() => bot.setSniper(!bot.sniper)}
+            >
+              {bot.sniper ? "إيقاف سكالب الدقيقة (1m)" : "صفقات سكالب على فريم الدقيقة (1m)"}
+            </Button>
+
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button className="bg-bull text-background hover:bg-bull/90" disabled={!!open || !price} onClick={bot.longNow}>
                 <TrendingUp className="h-4 w-4" /> شراء فوري (Long)
