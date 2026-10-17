@@ -58,3 +58,16 @@ describe("paper trading", () => {
     expect(s.pnl).toBeCloseTo(-0.1999, 3);
   });
 });
+
+import { fastEntrySignal, entrySignal } from "./trading";
+describe("fast scalping mode", () => {
+  const p = { emaFast: 9, emaSlow: 21, rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30 };
+  const uptrend = { emaFast: 101, emaSlow: 100, rsi: 55, prevEmaFast: 100.9, prevEmaSlow: 100, prevRsi: 54 };
+  it("enters in an ongoing uptrend where normal mode waits for a cross", () => {
+    expect(entrySignal(uptrend, p).buy).toBe(false);
+    expect(fastEntrySignal(uptrend, p).buy).toBe(true);
+  });
+  it("still never buys when RSI is overbought", () => {
+    expect(fastEntrySignal({ ...uptrend, rsi: 75 }, p).buy).toBe(false);
+  });
+});

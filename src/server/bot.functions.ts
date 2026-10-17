@@ -14,6 +14,8 @@ import {
   exitCheck,
   floorToStep,
   riskGate,
+  paperBuy,
+  paperSell as paperSellCalc,
   type ExitReason,
   type StrategyParams,
 } from "@/lib/trading";
@@ -130,13 +132,11 @@ async function sellTrade(userId: string, creds: Creds, trade: TradeRow, reason: 
   return { exitPrice, pnl };
 }
 
-const PAPER_FEE = 0.001; // 0.1% like Binance spot
 
 async function paperSell(userId: string, trade: TradeRow, price: number, reason: ExitReason) {
   const db = await admin();
   const qty = Number(trade.qty);
-  const proceeds = qty * price * (1 - PAPER_FEE);
-  const pnl = proceeds - Number(trade.entry_price) * qty;
+  const { proceeds, pnl } = paperSellCalc(qty, Number(trade.entry_price), price);
   const { data: s } = await db.from("bot_settings").select("paper_usdt, paper_btc").eq("user_id", userId).single();
   await db
     .from("bot_settings")
@@ -223,8 +223,7 @@ export async function tickUser(userId: string) {
     let qty: number;
     let entry: number;
     if (paper) {
-      qty = (size / price) * (1 - PAPER_FEE);
-      entry = size / qty; // fee-inclusive cost basis
+      ({ qty, entry } = paperBuy(size, price));
     } else {
       const order = await signedRequest<OrderResult>(creds!, "POST", "/api/v3/order", {
         symbol: settings.symbol,

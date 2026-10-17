@@ -77,7 +77,13 @@ export function entrySignal(ind: Indicators, p: StrategyParams): { buy: boolean;
   if (crossUp) return { buy: true, reason: `تقاطع EMA ${p.emaFast}/${p.emaSlow} صاعد` };
   const bounce = ind.emaFast > ind.emaSlow && ind.prevRsi < p.rsiOversold && ind.rsi >= p.rsiOversold;
   if (bounce) return { buy: true, reason: "ارتداد RSI من التشبع البيعي باتجاه صاعد" };
-  return { buy: false, reason: "لا توجد إشارة دخول" };
+  return {
+    buy: false,
+    reason:
+      ind.emaFast > ind.emaSlow
+        ? "يراقب السوق — الاتجاه صاعد، في انتظار تقاطع جديد أو ارتداد RSI"
+        : `يراقب السوق — في انتظار تقاطع EMA ${p.emaFast} صاعد فوق EMA ${p.emaSlow}`,
+  };
 }
 
 export type ExitReason = "stop_loss" | "take_profit" | "ema_cross" | "manual";
@@ -134,14 +140,22 @@ export function floorToStep(qty: number, step: number): number {
 
 export const PAPER_FEE = 0.001; // 0.1% per side, like Binance spot
 
-/** Simulated market buy of `sizeUsdt` at `price`; entry is the fee-inclusive cost basis. */
+/** Simulated market buy of `sizeUsdt` at `price`; the buy fee is taken from the received quantity. */
 export function paperBuy(sizeUsdt: number, price: number) {
-  const qty = (sizeUsdt / price) * (1 - PAPER_FEE);
-  return { qty, entry: sizeUsdt / qty };
+  return { qty: (sizeUsdt / price) * (1 - PAPER_FEE), entry: price };
 }
 
 /** Simulated market sell; pnl is net of both fees. */
 export function paperSell(qty: number, entry: number, price: number) {
   const proceeds = qty * price * (1 - PAPER_FEE);
-  return { proceeds, pnl: proceeds - entry * qty };
+  const cost = (qty * entry) / (1 - PAPER_FEE); // USDT spent on the buy
+  return { proceeds, pnl: proceeds - cost };
+}
+
+/** Fast scalping: looser entries for more frequent trades — any uptrend with RSI not overbought, or a deep RSI dip. */
+export function fastEntrySignal(ind: Indicators, p: StrategyParams): { buy: boolean; reason: string } {
+  if (ind.rsi >= p.rsiOverbought) return { buy: false, reason: "RSI في منطقة التشبع الشرائي" };
+  if (ind.emaFast > ind.emaSlow) return { buy: true, reason: "سكالبينغ سريع: اتجاه صاعد (EMA السريع فوق البطيء)" };
+  if (ind.rsi <= p.rsiOversold + 5) return { buy: true, reason: "سكالبينغ سريع: RSI منخفض جداً" };
+  return { buy: false, reason: `يراقب السوق — في انتظار صعود EMA ${p.emaFast} فوق EMA ${p.emaSlow}` };
 }
