@@ -81,7 +81,7 @@ export function sniperBracket(side: Side, entry: number, a: number, gold = true)
 /** Fast breakeven: once price moves 0.8×ATR in favour, return entry + round-trip spread; otherwise null. */
 export function fastBreakeven(side: Side, entry: number, price: number, a: number) {
   const d = side === "long" ? 1 : -1;
-  if (d * (price - entry) < SNIPER.beAtr * a) return null;
+  if (d * (price - entry) < SNIPER.beAtr * a - 1e-9) return null;
   return entry + d * entry * PAPER_FEE * 2;
 }
 
