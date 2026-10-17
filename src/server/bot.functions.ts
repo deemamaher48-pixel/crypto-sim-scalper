@@ -168,7 +168,7 @@ export const runBotTick = createServerFn({ method: "POST" })
       rsiOversold: Number(settings.rsi_oversold),
     };
     const klines = await fetchKlines(settings.symbol, settings.interval, 200, paper ? "live" : "testnet");
-    const price = klines[klines.length - 1].close;
+    const price = klines[klines.length - 1]!.close;
     const closed = klines.slice(0, -1).map((k) => k.close); // signals use closed candles only
     const ind = computeIndicators(closed, params);
 
@@ -284,7 +284,7 @@ export const closeTradeNow = createServerFn({ method: "POST" })
     if (!trade) throw new Error("الصفقة غير موجودة");
     if (trade.mode === "paper") {
       const k = await fetchKlines(trade.symbol, "1m", 1, "live");
-      return paperSell(context.userId, trade, k[0].close, "manual");
+      return paperSell(context.userId, trade, k[0]!.close, "manual");
     }
     const creds = await loadCreds(context.userId);
     if (!creds) throw new Error("أضف مفاتيح API أولاً");

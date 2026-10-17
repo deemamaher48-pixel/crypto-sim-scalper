@@ -7,7 +7,7 @@ export function ema(values: number[], period: number): number[] {
   let prev = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
   out[period - 1] = prev;
   for (let i = period; i < values.length; i++) {
-    prev = values[i] * k + prev * (1 - k);
+    prev = values[i]! * k + prev * (1 - k);
     out[i] = prev;
   }
   return out;
@@ -20,7 +20,7 @@ export function rsi(values: number[], period: number): number[] {
   let gain = 0;
   let loss = 0;
   for (let i = 1; i <= period; i++) {
-    const d = values[i] - values[i - 1];
+    const d = values[i]! - values[i - 1]!;
     if (d >= 0) gain += d;
     else loss -= d;
   }
@@ -28,7 +28,7 @@ export function rsi(values: number[], period: number): number[] {
   loss /= period;
   out[period] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
   for (let i = period + 1; i < values.length; i++) {
-    const d = values[i] - values[i - 1];
+    const d = values[i]! - values[i - 1]!;
     gain = (gain * (period - 1) + Math.max(d, 0)) / period;
     loss = (loss * (period - 1) + Math.max(-d, 0)) / period;
     out[i] = loss === 0 ? 100 : 100 - 100 / (1 + gain / loss);
@@ -61,12 +61,12 @@ export function computeIndicators(closes: number[], p: StrategyParams): Indicato
   if (n < 1 || [f[n], s[n], r[n], f[n - 1], s[n - 1], r[n - 1]].some((v) => !Number.isFinite(v)))
     return null;
   return {
-    emaFast: f[n],
-    emaSlow: s[n],
-    rsi: r[n],
-    prevEmaFast: f[n - 1],
-    prevEmaSlow: s[n - 1],
-    prevRsi: r[n - 1],
+    emaFast: f[n]!,
+    emaSlow: s[n]!,
+    rsi: r[n]!,
+    prevEmaFast: f[n - 1]!,
+    prevEmaSlow: s[n - 1]!,
+    prevRsi: r[n - 1]!,
   };
 }
 

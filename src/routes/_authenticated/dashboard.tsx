@@ -60,7 +60,7 @@ function useLiveKlines(symbol: string, interval: string) {
           setKlines((prev) => {
             if (!prev.length) return prev;
             const last = prev[prev.length - 1];
-            if (last.time === bar.time) return [...prev.slice(0, -1), bar];
+            if (last?.time === bar.time) return [...prev.slice(0, -1), bar];
             return [...prev.slice(-299), bar];
           });
         };

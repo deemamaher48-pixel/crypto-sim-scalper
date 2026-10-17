@@ -69,7 +69,10 @@ function SettingsPage() {
       }
     if (Number(form.ema_fast) >= Number(form.ema_slow)) errs.push("EMA السريع يجب أن يكون أصغر من البطيء");
     if (Number(form.rsi_oversold) >= Number(form.rsi_overbought)) errs.push("حدود RSI غير منطقية");
-    if (errs.length) return toast.error(errs[0]);
+    if (errs.length) {
+      toast.error(errs[0]);
+      return;
+    }
     setSaving(true);
     const payload = Object.fromEntries(groups.flatMap((g) => g.fields.map((f) => [f.key, Number(form[f.key])])));
     const { error } = await supabase
@@ -77,7 +80,10 @@ function SettingsPage() {
       .update({ ...payload, mode: form.mode, updated_at: new Date().toISOString() })
       .eq("user_id", s.user_id);
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("تم حفظ الإعدادات");
     qc.invalidateQueries({ queryKey: ["settings"] });
   }

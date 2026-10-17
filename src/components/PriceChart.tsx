@@ -69,7 +69,7 @@ export default function PriceChart({
     candles.current.setData(klines.map((k) => ({ ...k, time: k.time as UTCTimestamp })));
     const closes = klines.map((k) => k.close);
     const toLine = (vals: number[]) =>
-      vals.flatMap((v, i) => (Number.isFinite(v) ? [{ time: klines[i].time as UTCTimestamp, value: v }] : []));
+      vals.flatMap((v, i) => (Number.isFinite(v) ? [{ time: klines[i]!.time as UTCTimestamp, value: v }] : []));
     fastS.current?.setData(toLine(ema(closes, emaFast)));
     slowS.current?.setData(toLine(ema(closes, emaSlow)));
   }, [klines, emaFast, emaSlow]);
