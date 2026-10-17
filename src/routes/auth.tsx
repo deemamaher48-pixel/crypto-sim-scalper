@@ -35,7 +35,7 @@ function AuthPage() {
       if (mode === "in") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/dashboard" });
+        navigate({ to: "/" });
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -59,7 +59,7 @@ function AuthPage() {
       return;
     }
     if (r.redirected) return;
-    navigate({ to: "/dashboard" });
+    navigate({ to: "/" });
   }
 
   return (

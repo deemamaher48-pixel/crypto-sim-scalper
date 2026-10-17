@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useBackgroundPaper } from "@/hooks/use-background-paper";
 import { Power, RotateCcw, X, TrendingUp, TrendingDown } from "lucide-react";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { START_BALANCE, useLocalPaper, type LocalSettings } from "@/hooks/use-local-paper";
@@ -14,10 +17,10 @@ const PriceChart = lazy(() => import("@/components/PriceChart"));
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "سكالبر — شارت الذهب XAU/USD مباشر وبوت سكالبينغ" },
-      { name: "description", content: "شارت الذهب XAU/USD حقيقي لحظي مع بوت سكالبينغ آلي ورصيد محاكاة 10,000 USDT، بدون تسجيل." },
-      { property: "og:title", content: "سكالبر — شارت الذهب XAU/USD مباشر وبوت سكالبينغ" },
-      { property: "og:description", content: "أسعار حقيقية لحظية، تداول افتراضي آلي بمؤشرات EMA و RSI." },
+      { title: "سكالبر — بوت بيتكوين وذهب وسجل تداول دائم" },
+      { name: "description", content: "محاكاة تداول بيتكوين والذهب مع بوت خلفي للحساب المسجل وسجل دائم لأوقات الصفقات." },
+      { property: "og:title", content: "سكالبر — بوت بيتكوين وذهب وسجل تداول دائم" },
+      { property: "og:description", content: "بوت خلفي للحساب المسجل وسجل دائم لأوقات الصفقات بأسعار السوق الحية." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -32,12 +35,16 @@ const riskFields: { key: keyof LocalSettings; label: string; min: number; max: n
 ];
 
 function Home() {
+  const identity = useQuery({queryKey:["home-identity"],queryFn:async()=>{const {data,error}=await supabase.auth.getUser();if(error)return null;return data.user;}});
   const [sym, setSym] = useState<"BTCUSDT" | "PAXGUSDT">("BTCUSDT");
   const gold = sym === "PAXGUSDT";
   const { klines, connected } = useLiveKlines(sym, "5m");
   const { klines: k15 } = useLiveKlines(sym, "15m");
   const { klines: k1 } = useLiveKlines(sym, "1m");
-  const bot = useLocalPaper(klines, k15, gold, k1);
+  const local = useLocalPaper(klines, k15, gold, k1, !identity.isPending && !identity.data);
+  const background = useBackgroundPaper(identity.data?.id, local, klines, k15, k1);
+  const bot = background.bot;
+  useEffect(()=>{if(background.symbol)setSym(background.symbol);},[background.symbol]);
   const chartK = bot.sniper ? k1 : klines;
   const { settings: s, ind, extras, open, price } = bot;
   const change = price - (chartK.at(-2)?.close ?? price);
@@ -55,7 +62,7 @@ function Home() {
           <span className="text-lg font-bold">سكالبر<span className="text-primary">.</span></span>
           <span className="rounded bg-primary/15 px-2 py-0.5 text-xs text-primary">محاكاة · أسعار حقيقية</span>
           <Link to="/dashboard" className="ms-auto text-sm text-muted-foreground hover:text-foreground">
-            وضع Testnet (تسجيل دخول)
+            حسابي وسجل الصفقات
           </Link>
         </div>
       </header>
@@ -68,7 +75,7 @@ function Home() {
                 {([["BTCUSDT", "بيتكوين BTC/USDT"], ["PAXGUSDT", "ذهب XAU/USD"]] as const).map(([v, l]) => (
                   <Button key={v} size="sm" variant={sym === v ? "default" : "outline"} disabled={!!open && sym !== v}
                     title={open && sym !== v ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
-                    onClick={() => setSym(v)}>{l}</Button>
+                    onClick={() => background.cloud ? background.setSymbol(v) : setSym(v)}>{l}</Button>
                 ))}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -111,13 +118,14 @@ function Home() {
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b">
-                    {["الوقت", "الاتجاه", "الدخول", "الخروج", "صافي الربح", "النتيجة"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
+                    {["وقت الدخول", "وقت الإغلاق", "الاتجاه", "الدخول", "الخروج", "صافي الربح", "النتيجة"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {bot.trades.map((t) => (
                     <tr key={t.id} className="border-b last:border-0">
                       <td className="num whitespace-nowrap px-3 py-2 text-xs">{new Date(t.openedAt).toLocaleString("en-GB")}</td>
+                      <td className="num whitespace-nowrap px-3 py-2 text-xs">{t.closedAt ? new Date(t.closedAt).toLocaleString("en-GB") : "—"}</td>
                       <td className="px-3 py-2"><SideTag side={t.side} /></td>
                       <td className="num px-3 py-2">{fmt(t.entry)}</td>
                       <td className="num px-3 py-2">{fmt(t.exit)}</td>
@@ -125,7 +133,7 @@ function Home() {
                       <td className={`whitespace-nowrap px-3 py-2 text-xs ${t.pnl == null || t.pnl === 0 ? "text-muted-foreground" : t.pnl > 0 ? "text-bull" : "text-bear"}`}>{t.closedAt ? tradeOutcome(t.pnl ?? 0) : "مفتوحة"}</td>
                     </tr>
                   ))}
-                  {bot.trades.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">شغّل البوت لتبدأ الصفقات.</td></tr>}
+                  {bot.trades.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">شغّل البوت لتبدأ الصفقات.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -139,7 +147,7 @@ function Home() {
                 <Power className={`h-4 w-4 ${bot.enabled ? "text-bull" : "text-muted-foreground"}`} />
                 البوت {bot.enabled ? "يعمل" : "متوقف"}
               </div>
-              <Switch checked={bot.enabled} onCheckedChange={bot.setEnabled} aria-label="تشغيل البوت" />
+              <Switch checked={bot.enabled} disabled={background.busy || identity.isPending} onCheckedChange={bot.setEnabled} aria-label="تشغيل البوت" />
             </div>
             <StatusBadge tone={bot.status.tone} text={bot.status.text} />
             <Button
@@ -158,15 +166,15 @@ function Home() {
                 <TrendingDown className="h-4 w-4" /> بيع فوري (Short)
               </Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">يتداول البوت طالما الصفحة مفتوحة، ويقرر عند إغلاق كل شمعة 5 دقائق.</p>
+            {background.cloud ? <div className="mt-3 space-y-1 text-xs text-muted-foreground"><p>حساب دائم · {bot.enabled ? "تشغيل بالخلفية" : "متوقف"}</p><p>آخر فحص: {background.lastTickAt ? new Date(background.lastTickAt).toLocaleString("en-GB") : "بانتظار أول فحص"}</p></div> : <div className="mt-3 space-y-2 text-xs text-muted-foreground"><p>تجربة محلية · تتوقف عند إغلاق الصفحة</p><Button asChild variant="outline" size="sm" className="w-full"><Link to="/auth">سجّل دخولك للتشغيل بغيابك والسجل الدائم</Link></Button></div>}
           </div>
 
           <div className="rounded-lg border bg-card p-4">
             <div className="mb-3 flex items-center justify-between text-sm font-semibold">
               رصيد المحاكاة
-              <button onClick={() => confirm("إعادة الرصيد إلى 10,000 USDT وحذف السجل؟") && bot.reset()} className="text-muted-foreground hover:text-foreground" aria-label="إعادة ضبط">
+              <Button variant="ghost" size="icon" disabled={background.cloud} onClick={() => confirm("إعادة الرصيد إلى 10,000 USDT وحذف السجل؟") && bot.reset()} className="text-muted-foreground hover:text-foreground" aria-label="إعادة ضبط">
                 <RotateCcw className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Stat label="USDT متاح" value={fmt(bot.usdt)} />

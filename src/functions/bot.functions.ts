@@ -160,6 +160,8 @@ export const runBotTick = createServerFn({ method: "POST" })
 
 /** One bot step for one user. Called by the open dashboard and by the background job. */
 export async function tickUser(userId: string) {
+    const { data: service } = await (await admin()).from("paper_services").select("user_id").eq("user_id",userId).maybeSingle();
+    if (service) return {action:"idle" as const,message:"البوت الخلفي يُدار من الصفحة الرئيسية"};
     const { data: settings } = await (await admin()).from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
     if (!settings) return { action: "idle" as const, message: "احفظ الإعدادات أولاً" };
     const paper = settings.mode !== "testnet";
@@ -302,8 +304,10 @@ export async function tickUser(userId: string) {
 export const resetPaperAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const db = await admin();
-    await db.from("trades").delete().eq("user_id", context.userId).eq("mode", "paper");
+    const { data: open } = await context.supabase.from("trades").select("id").eq("status","open").limit(1);
+    if(open?.length) throw new Error("أغلق الصفقة قبل إعادة ضبط الرصيد");
+    const {data:service}=await context.supabase.from("paper_services").select("user_id").maybeSingle();
+    if(service) throw new Error("سجل البوت الدائم محفوظ ولا يُحذف بإعادة الضبط");
     await context.supabase
       .from("bot_settings")
       .update({ paper_usdt: 10000, paper_btc: 0, enabled: false })
