@@ -35,7 +35,11 @@ export const backgroundAction=createServerFn({method:'POST'}).middleware([requir
  if(data.action==='enable'){s.enabled=!!data.on;if(data.on&&s.sniper){s.sniperResetAt=Date.now();s.sniperPausedUntil=0;}}
  if(data.action==='sniper'){s.sniper=!!data.on;s.lastCandle=0;if(data.on){s.sniperResetAt=Date.now();s.sniperPausedUntil=0;}}
  if(data.action==='symbol'&&data.symbol){s.symbol=data.symbol;s.lastCandle=0;}
- if(data.action==='risk')s.settings={...s.settings,...data.risk};
+ if(data.action==='risk'&&data.risk){
+  if(data.risk.positionUsdt!=null)s.settings.positionUsdt=data.risk.positionUsdt;
+  if(data.risk.maxTradesPerDay!=null)s.settings.maxTradesPerDay=data.risk.maxTradesPerDay;
+  if(data.risk.maxDailyLossUsdt!=null)s.settings.maxDailyLossUsdt=data.risk.maxDailyLossUsdt;
+ }
  return {state:s,message:s.enabled?'البوت يعمل بالخلفية':'البوت متوقف'};
  });
 });

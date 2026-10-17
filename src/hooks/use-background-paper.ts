@@ -11,7 +11,7 @@ import type { useLocalPaper,LocalSettings,BotStatus } from '@/hooks/use-local-pa
 export function useBackgroundPaper(userId:string|undefined,local:ReturnType<typeof useLocalPaper>,k5:Kline[],k15:Kline[],k1:Kline[]) {
  const read=useServerFn(getBackground),action=useServerFn(backgroundAction),qc=useQueryClient();
  const query=useQuery({queryKey:['background',userId],queryFn:()=>read(),enabled:!!userId,refetchInterval:10000});
- const mutation=useMutation({mutationFn:(data:Parameters<typeof action>[0]['data'])=>action({data}),onSuccess:()=>{qc.invalidateQueries({queryKey:['background']});qc.invalidateQueries({queryKey:['trades']});},onError:(e)=>toast.error(e.message)});
+ const mutation=useMutation({mutationFn:(data:NonNullable<Parameters<typeof action>[0]>['data'])=>action({data}),onSuccess:()=>{qc.invalidateQueries({queryKey:['background']});qc.invalidateQueries({queryKey:['trades']});},onError:(e)=>toast.error(e.message)});
  const s=query.data?.state??initialPaperState(), bars=s.sniper?k1:k5,closed=bars.slice(0,-1),filter=(s.sniper?k5:k15).slice(0,-1),price=bars.at(-1)?.close??0,open=s.trades.find(t=>!t.closedAt),q=open?.remainingQty??open?.qty??0;
  const pnl=open?sidePnl(open.side,q,open.entry,price||open.entry):0;
  const stale=query.data?.lastTickAt && Date.now()-Date.parse(query.data.lastTickAt)>120000;
