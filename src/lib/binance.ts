@@ -7,16 +7,29 @@ export const LIVE_WS = "wss://data-stream.binance.vision/ws";
 
 export type Kline = { time: number; open: number; high: number; low: number; close: number; volume: number };
 
+// Fallback hosts for live market data; tried in order with retry.
+export const LIVE_HOSTS = [LIVE_REST, "https://api.binance.com", "https://api1.binance.com", "https://api3.binance.com"];
+
 export async function fetchKlines(
   symbol: string,
   interval: string,
   limit = 200,
   source: "live" | "testnet" = "live",
 ): Promise<Kline[]> {
-  const base = source === "live" ? LIVE_REST : TESTNET_REST;
-  const res = await fetch(`${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
-  if (!res.ok) throw new Error(`تعذر جلب الشموع (${res.status})`);
-  const rows = (await res.json()) as unknown[][];
+  const hosts = source === "live" ? LIVE_HOSTS : [TESTNET_REST];
+  let rows: unknown[][] | null = null;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2 && !rows; attempt++) {
+    for (const base of hosts) {
+      try {
+        const res = await fetch(`${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        if (!res.ok) throw new Error(`تعذر جلب الشموع (${res.status})`);
+        const data = (await res.json()) as unknown[][];
+        if (Array.isArray(data) && data.length) { rows = data; break; }
+      } catch (e) { lastErr = e; }
+    }
+  }
+  if (!rows) throw lastErr instanceof Error ? lastErr : new Error("تعذر جلب الشموع");
   return rows.map((r) => ({
     time: Math.floor(Number(r[0]) / 1000),
     open: Number(r[1]),
