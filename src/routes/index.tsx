@@ -4,7 +4,7 @@ import { Power, RotateCcw, X, Zap, TrendingUp, TrendingDown } from "lucide-react
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { START_BALANCE, useLocalPaper, type LocalSettings } from "@/hooks/use-local-paper";
 import { tradeOutcome } from "@/lib/trade-history";
-import { fmt } from "@/lib/queries";
+import { fmt, fmtSigned } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -48,6 +48,7 @@ function Home() {
   const closed = bot.trades.filter((t) => t.closedAt);
   const wins = closed.filter((t) => (t.pnl ?? 0) > 0).length;
   const openPnl = bot.unrealized;
+  const movePnl = open && price ? (open.side === "short" ? -1 : 1) * (price - open.entry) * open.qty : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,7 +170,7 @@ function Home() {
               <Stat label="USDT متاح" value={fmt(bot.usdt)} />
               <Stat label="هامش مستخدم" value={fmt(open?.size ?? 0)} />
               <Stat label="القيمة الكلية" value={fmt(equity)} />
-              <Stat label="إجمالي الربح" value={fmt(totalPnl)} cls={totalPnl >= 0 ? "text-bull" : "text-bear"} />
+              <Stat label="إجمالي الربح" value={fmtSigned(totalPnl)} cls={totalPnl >= 0 ? "text-bull" : "text-bear"} />
             </div>
           </div>
 
@@ -180,7 +181,8 @@ function Home() {
                 <Row k="الدخول" v={fmt(open.entry)} />
                 <Row k="وقف الخسارة" v={fmt(open.stop)} cls="text-bear" />
                 <Row k="جني الأرباح" v={fmt(open.target)} cls="text-bull" />
-                <Row k="غير محقق" v={`${fmt(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
+                <Row k="ربح/خسارة السعر" v={`${fmtSigned(movePnl)} USDT`} cls={movePnl >= 0 ? "text-bull" : "text-bear"} />
+                <Row k="الصافي بعد الرسوم" v={`${fmtSigned(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
                 <Button variant="destructive" size="sm" className="mt-2 w-full" onClick={bot.closeNow}>
                   <X className="h-4 w-4" /> إغلاق فوري
                 </Button>
