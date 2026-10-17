@@ -183,10 +183,10 @@ function Dashboard() {
               <Stat label="USDT" value={fmt(s.paper_usdt)} />
               <Stat label="BTC" value={fmt(s.paper_btc, 5)} />
               <Stat label="القيمة الكلية" value={fmt(equity)} />
-              <Stat label="ربح اليوم" value={fmt(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
+              <Stat label="ربح اليوم" value={fmtSigned(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
             </div>
           ) : (
-            <Stat label="ربح اليوم" value={fmt(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
+            <Stat label="ربح اليوم" value={fmtSigned(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
           )}
         </div>
 
