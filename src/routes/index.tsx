@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
-import { Power, RotateCcw, X } from "lucide-react";
+import { Power, RotateCcw, X, Zap, FlaskConical } from "lucide-react";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { START_BALANCE, useLocalPaper, type LocalSettings } from "@/hooks/use-local-paper";
 import { exitReasonLabel } from "@/lib/trading";
@@ -127,10 +127,19 @@ function Home() {
               </div>
               <Switch checked={bot.enabled} onCheckedChange={bot.setEnabled} aria-label="تشغيل البوت" />
             </div>
-            <div className="mt-3 rounded-md bg-muted px-3 py-2 text-sm">
-              الحالة: <span className="text-muted-foreground">{bot.status}</span>
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">يتداول البوت طالما الصفحة مفتوحة، ويقرر عند إغلاق كل شمعة.</p>
+            <StatusBadge tone={bot.status.tone} text={bot.status.text} />
+            <label className="mt-3 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+              <span className="flex items-center gap-2">
+                <Zap className={`h-4 w-4 ${s.fastMode ? "text-primary" : "text-muted-foreground"}`} />
+                سكالبينغ سريع
+                <span className="text-xs text-muted-foreground">(دخول أكثر مرونة)</span>
+              </span>
+              <Switch checked={s.fastMode} onCheckedChange={(v) => bot.updateSettings({ fastMode: v })} aria-label="سكالبينغ سريع" />
+            </label>
+            <Button variant="secondary" className="mt-3 w-full" disabled={!!open || !price} onClick={bot.buyNow}>
+              <FlaskConical className="h-4 w-4" /> تجربة صفقة فورية (شراء تجريبي)
+            </Button>
+            <p className="mt-2 text-xs text-muted-foreground">يتداول البوت طالما الصفحة مفتوحة، ويقرر عند إغلاق كل شمعة دقيقة.</p>
           </div>
 
           <div className="rounded-lg border bg-card p-4">
@@ -195,6 +204,23 @@ function RiskPanel({ settings, onSave }: { settings: LocalSettings; onSave: (p: 
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+const toneCls = {
+  off: "border-border bg-muted text-muted-foreground",
+  watch: "border-chart-2/40 bg-chart-2/10 text-chart-2",
+  ready: "border-bull/40 bg-bull/10 text-bull",
+  open: "border-primary/40 bg-primary/10 text-primary",
+  blocked: "border-bear/40 bg-bear/10 text-bear",
+} as const;
+
+function StatusBadge({ tone, text }: { tone: keyof typeof toneCls; text: string }) {
+  return (
+    <div className={`mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${toneCls[tone]}`} role="status">
+      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full bg-current ${tone === "watch" || tone === "open" ? "animate-pulse" : ""}`} />
+      <span>{text}</span>
     </div>
   );
 }
