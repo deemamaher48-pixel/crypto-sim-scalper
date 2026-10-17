@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Home background paper service, permanent account trade history, authenticated controls, and closed-page verification.
 - [x] Cloud, login, tables, trading logic + tests
 - [x] Dashboard (chart, live price, bot panel), Settings, Trades pages
 - [x] Paper trading as default mode with ready virtual balance (no API keys needed); Testnet optional
