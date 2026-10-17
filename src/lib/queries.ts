@@ -43,13 +43,19 @@ export const settingsQuery = queryOptions({
 export const tradesQuery = queryOptions({
   queryKey: ["trades"],
   queryFn: async () => {
-    const { data, error } = await supabase
-      .from("trades")
-      .select("*")
-      .order("opened_at", { ascending: false })
-      .limit(500);
-    if (error) throw error;
-    return data;
+    const trades: Trade[] = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from("trades")
+        .select("*")
+        .order("opened_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      trades.push(...data);
+      if (data.length < pageSize) return trades;
+    }
   },
 });
 

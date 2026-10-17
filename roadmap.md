@@ -8,5 +8,6 @@
 - [x] Home: precise bot status badge, instant test buy button, fast scalping mode
 - [x] Home futures-style paper: Long & Short, MACD + ATR (dynamic SL/TP), instant Long/Short buttons, chart shows side
 - [x] Add Stochastic, Bollinger Bands, VWAP, ADX, EMA 50/200 to indicators panel; ADX picks trend vs range
-- [x] Show actual net profit in green and losses in red across trade results and notifications; distinguish reaching target from net profit.
+- [x] Show net gains in green as جني أرباح and losses in red as وقف خسارة in records and notifications, regardless of side or exit trigger.
+- [x] Retain all new local trades and read all account trades through pagination, without a 500-trade history cap.
 - [x] Make chart dragging pan without accidental zoom; add explicit zoom and return-to-live controls.

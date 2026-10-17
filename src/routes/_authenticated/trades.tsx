@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { exitReasonLabel } from "@/lib/trading";
+import { tradeOutcome } from "@/lib/trade-history";
 import { fmt, tradesQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/trades")({
@@ -113,7 +113,7 @@ function TradesPage() {
                     {t.status === "open" ? "مفتوحة" : `${Number(t.pnl) > 0 ? "+" : ""}${fmt(t.pnl)}`}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{t.entry_reason}</td>
-                  <td className="px-3 py-2 text-xs">{t.exit_reason === "take_profit" && Number(t.pnl) < 0 ? "بلوغ الهدف — خسارة بعد الرسوم" : t.exit_reason ? exitReasonLabel[t.exit_reason] ?? t.exit_reason : "—"}</td>
+                  <td className={`whitespace-nowrap px-3 py-2 text-xs ${t.pnl == null || Number(t.pnl) === 0 ? "text-muted-foreground" : Number(t.pnl) > 0 ? "text-bull" : "text-bear"}`}>{t.status === "closed" ? tradeOutcome(Number(t.pnl ?? 0)) : "مفتوحة"}</td>
                 </tr>
               ))}
               {rows.length === 0 && (
