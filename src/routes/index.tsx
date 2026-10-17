@@ -30,13 +30,13 @@ function Index() {
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-6 py-20">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
-          <span className="h-2 w-2 rounded-full bg-bull" /> Binance Spot Testnet
+          <span className="h-2 w-2 rounded-full bg-bull" /> أسعار حقيقية · رصيد افتراضي 10,000 USDT
         </div>
         <h1 className="text-4xl font-bold leading-tight md:text-6xl">
           سكالبينغ آلي <span className="text-primary">بانضباط</span>
         </h1>
         <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-          بوت يتداول BTC/USDT نيابةً عنك بقواعد واضحة، بدون عواطف وبدون مخاطرة بأموال حقيقية.
+          بوت يتداول BTC/USDT نيابةً عنك بقواعد واضحة، ابدأ فوراً بالمحاكاة على السوق الحقيقي بدون أي مفاتيح، وانتقل لـ Testnet متى بدك.
         </p>
         <div className="mt-8 flex gap-3">
           <Link to="/dashboard" className="rounded-md bg-primary px-6 py-3 font-semibold text-primary-foreground hover:bg-primary/90">
