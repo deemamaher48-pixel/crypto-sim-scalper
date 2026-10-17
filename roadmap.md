@@ -12,3 +12,4 @@
 - [x] Retain all new local trades and read all account trades through pagination, without a 500-trade history cap.
 - [x] Make chart dragging pan without accidental zoom; add explicit zoom and return-to-live controls.
 - [x] 1m Sniper scalping toggle (fast breakeven, 3-bar time stop, circuit breaker; re-enable clears cooldown)
+- [x] Sniper toggle lives in the bot card under the run switch; chart switches to 1m while it is on
