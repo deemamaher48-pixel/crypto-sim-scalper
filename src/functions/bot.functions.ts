@@ -319,6 +319,15 @@ export const closeTradeNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: { tradeId: string }) => ({ tradeId: String(i.tradeId) }))
   .handler(async ({ data, context }) => {
+    const { data: service } = await context.supabase.from("paper_services").select("state").eq("user_id",context.userId).maybeSingle();
+    if(service){
+      const state=service.state as {trades?: {id:string;closedAt?:string;pnl?:number;exit?:number}[]};
+      if(!state.trades?.some(t=>t.id===data.tradeId&&!t.closedAt))throw new Error("الصفقة غير موجودة");
+      const {tickBackgroundUser}=await import("@/functions/background.functions");
+      const result=await tickBackgroundUser(context.userId,"close");
+      const trade=result.state.trades.find(t=>t.id===data.tradeId);
+      return {pnl:trade?.pnl??0,exitPrice:trade?.exit??0};
+    }
     const db = await admin();
     const { data: trade } = await db
       .from("trades")

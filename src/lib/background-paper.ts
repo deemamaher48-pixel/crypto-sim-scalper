@@ -41,6 +41,7 @@ export function stepPaper(input: PaperState, bars: Kline[], filter: Kline[], now
  if(!side||!a) return {state:s,message};
  const br=(s.sniper?sniperBracket:smartBracket)(side,price,a,s.symbol==='PAXGUSDT'),size=s.settings.positionUsdt;
  const trade:LocalTrade={id:crypto.randomUUID(),side,size,qty:size/price,remainingQty:size/price,realized:0,tp1:br.tp1,tp1Hit:false,best:price,entry:price,stop:br.stop,target:br.target,entryReason:manual?'صفقة يدوية':sig?.reason??'',openedAt:new Date(now).toISOString(),atr:a,...(s.sniper?{mode:'sniper' as const}:{})};
+ trade.symbol=s.symbol;
  s.usdt-=size;s.trades.unshift(trade);message=`فتح ${side==='long'?'Long':'Short'} عند ${price}`;
  return {state:s,message};
 }

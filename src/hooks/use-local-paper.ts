@@ -22,6 +22,7 @@ export type LocalSettings = StrategyParams & {
 };
 export type LocalExit = "stop_loss" | "take_profit" | "ema_cross" | "manual" | "time_stop" | "vwap_break" | "trailing";
 export type LocalTrade = {
+  symbol?: "BTCUSDT" | "PAXGUSDT";
   id: string;
   side: Side;
   size: number; // USDT margin/notional
