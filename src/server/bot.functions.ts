@@ -152,9 +152,11 @@ async function paperSell(userId: string, trade: TradeRow, price: number, reason:
 
 export const runBotTick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: settings } = await supabase.from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
+  .handler(async ({ context }) => tickUser(context.userId));
+
+/** One bot step for one user. Called by the open dashboard and by the background job. */
+export async function tickUser(userId: string) {
+    const { data: settings } = await (await admin()).from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
     if (!settings) return { action: "idle" as const, message: "احفظ الإعدادات أولاً" };
     const paper = settings.mode !== "testnet";
     const creds = paper ? null : await loadCreds(userId);
@@ -255,7 +257,7 @@ export const runBotTick = createServerFn({ method: "POST" })
       entry_reason: sig.reason,
     });
     return { action: "buy" as const, price, ind, message: `شراء عند ${price.toFixed(2)} — ${sig.reason}` };
-  });
+}
 
 export const resetPaperAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
