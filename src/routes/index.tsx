@@ -182,7 +182,7 @@ function Home() {
                 <Row k="وقف الخسارة" v={fmt(open.stop)} cls="text-bear" />
                 <Row k="جني الأرباح" v={fmt(open.target)} cls="text-bull" />
                 <Row k="ربح/خسارة السعر" v={`${fmtSigned(movePnl)} USDT`} cls={movePnl >= 0 ? "text-bull" : "text-bear"} />
-                <Row k="الصافي بعد الرسوم" v={`${fmtSigned(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
+                <Row k="الصافي بعد السبريد" v={`${fmtSigned(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
                 <Button variant="destructive" size="sm" className="mt-2 w-full" onClick={bot.closeNow}>
                   <X className="h-4 w-4" /> إغلاق فوري
                 </Button>
