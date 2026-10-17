@@ -49,3 +49,12 @@ describe("trading rules", () => {
     expect(floorToStep(0.0012345, 0.00001)).toBe(0.00123);
   });
 });
+
+import { paperBuy, paperSell } from "./trading";
+describe("paper trading", () => {
+  it("charges 0.1% per side so a flat round trip loses about 0.2%", () => {
+    const b = paperBuy(100, 50000);
+    const s = paperSell(b.qty, b.entry, 50000);
+    expect(s.pnl).toBeCloseTo(-0.1999, 3);
+  });
+});

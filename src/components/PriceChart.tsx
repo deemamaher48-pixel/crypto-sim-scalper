@@ -11,13 +11,19 @@ import { ema } from "@/lib/trading";
 import type { Kline } from "@/lib/binance";
 
 function cssColor(name: string) {
-  // Resolve a theme token into a concrete rgb() string the canvas can use.
+  // Resolve a theme token (oklch) into rgba() via canvas — the chart library can't parse oklch.
   const el = document.createElement("div");
   el.style.color = `var(${name})`;
   document.body.appendChild(el);
   const c = getComputedStyle(el).color;
   el.remove();
-  return c;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 1;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = c;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, bl, a] = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgba(${r}, ${g}, ${bl}, ${((a ?? 255) / 255).toFixed(2)})`;
 }
 
 export default function PriceChart({
@@ -44,9 +50,16 @@ export default function PriceChart({
     const grid = cssColor("--border");
     const c = createChart(ref.current, {
       autoSize: true,
+      localization: {
+        locale: "en-US",
+        priceFormatter: (p: number) => p.toFixed(2),
+        timeFormatter: (t: number) => new Date(t * 1000).toISOString().slice(11, 16),
+      },
       layout: { background: { color: "transparent" }, textColor: fg, fontFamily: "JetBrains Mono" },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: grid },
+      timeScale: {
+        tickMarkFormatter: (t: number) => new Date(t * 1000).toISOString().slice(11, 16),
+        timeVisible: true, secondsVisible: false, borderColor: grid },
       rightPriceScale: { borderColor: grid },
     });
     const bull = cssColor("--bull");
