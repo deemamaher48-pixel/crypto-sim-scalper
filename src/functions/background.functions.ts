@@ -21,7 +21,7 @@ export async function tickBackgroundUser(userId:string,manual?:'long'|'short'|'c
 export const getBackground = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  const {data,error}=await context.supabase.from('paper_services').select('state,last_tick_at,last_message').eq('user_id',context.userId).maybeSingle();if(error)throw error;return data?{state:data.state as unknown as PaperState,lastTickAt:data.last_tick_at,message:data.last_message}:null;
 });
-export const backgroundAction=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator(i=>z.object({action:z.enum(['enable','sniper','symbol','risk','long','short','close']),on:z.boolean().optional(),symbol:z.enum(['BTCUSDT','PAXGUSDT']).optional(),risk:z.object({positionUsdt:z.number().min(10).max(100000).optional(),maxTradesPerDay:z.number().int().min(1).max(500).optional(),maxDailyLossUsdt:z.number().min(1).max(100000).optional()}).optional()}).parse(i)).handler(async({context,data})=>{
+export const backgroundAction=createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator(i=>z.object({action:z.enum(['enable','sniper','symbol','risk','long','short','close','tick']),on:z.boolean().optional(),symbol:z.enum(['BTCUSDT','PAXGUSDT']).optional(),risk:z.object({positionUsdt:z.number().min(10).max(100000).optional(),maxTradesPerDay:z.number().int().min(1).max(500).optional(),maxDailyLossUsdt:z.number().min(1).max(100000).optional()}).optional()}).parse(i)).handler(async({context,data})=>{
  const client=await db();
  const {data:existing,error}=await client.from('paper_services').select('user_id').eq('user_id',context.userId).maybeSingle();if(error)throw error;
  if(!existing){
@@ -29,6 +29,7 @@ export const backgroundAction=createServerFn({method:'POST'}).middleware([requir
  const {error:ie}=await client.from('paper_services').insert({user_id:context.userId,state:initialPaperState() as unknown as Json});if(ie)throw ie;
  const {error:se}=await client.from('bot_settings').update({enabled:false}).eq('user_id',context.userId);if(se)throw se;
  }
+ if(data.action==='tick')return tickBackgroundUser(context.userId);
  if(data.action==='long'||data.action==='short'||data.action==='close')return tickBackgroundUser(context.userId,data.action);
  return locked(context.userId,async s=>{
  if((data.action==='sniper'||data.action==='symbol')&&s.trades.some(t=>!t.closedAt))throw new Error('أغلق الصفقة قبل التبديل');
