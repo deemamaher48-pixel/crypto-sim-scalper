@@ -1,4 +1,4 @@
-import { smartBracket, smartCandleExit, smartSignal } from "@/lib/smart-scalp";
+import { inCooldown, smartBracket, smartCandleExit, smartSignal } from "@/lib/smart-scalp";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -218,6 +218,11 @@ export async function tickUser(userId: string) {
       if (!extras) return { action: "idle" as const, price, ind, message: "بيانات غير كافية للمؤشرات" };
       const sig = smart ?? { side: null, reason: "يجمع بيانات شموع 5m و15m…" };
       if (!sig.side) return { action: "wait" as const, price, ind, message: sig.reason };
+      const { data: lastLoss } = await db
+        .from("trades").select("closed_at").eq("user_id", userId).eq("status", "closed").lt("pnl", 0)
+        .order("closed_at", { ascending: false }).limit(1).maybeSingle();
+      if (inCooldown(lastLoss?.closed_at ? Date.parse(lastLoss.closed_at) : null, Date.now()))
+        return { action: "wait" as const, price, ind, message: "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
       side = sig.side;
       reasonText = sig.reason;
     } else {
