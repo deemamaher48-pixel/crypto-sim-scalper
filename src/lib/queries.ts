@@ -63,3 +63,10 @@ export function fmt(n: number | null | undefined, d = 2) {
   if (n == null || !Number.isFinite(Number(n))) return "—";
   return Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 }
+
+/** Signed money: +1.23 for profit, -1.23 for loss. */
+export function fmtSigned(n: number | null | undefined, d = 2) {
+  if (n == null || !Number.isFinite(Number(n))) return "—";
+  const v = Number(n);
+  return (v > 0 ? "+" : "") + fmt(v, d);
+}

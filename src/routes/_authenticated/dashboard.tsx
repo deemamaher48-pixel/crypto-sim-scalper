@@ -7,7 +7,7 @@ import { Power, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { computeIndicators, entrySignal } from "@/lib/trading";
-import { fmt, settingsQuery, tradesQuery } from "@/lib/queries";
+import { fmt, fmtSigned, settingsQuery, tradesQuery } from "@/lib/queries";
 import { tradeOutcome } from "@/lib/trade-history";
 import { closeTradeNow, runBotTick } from "@/functions/bot.functions";
 import { Button } from "@/components/ui/button";
@@ -183,10 +183,10 @@ function Dashboard() {
               <Stat label="USDT" value={fmt(s.paper_usdt)} />
               <Stat label="BTC" value={fmt(s.paper_btc, 5)} />
               <Stat label="القيمة الكلية" value={fmt(equity)} />
-              <Stat label="ربح اليوم" value={fmt(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
+              <Stat label="ربح اليوم" value={fmtSigned(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
             </div>
           ) : (
-            <Stat label="ربح اليوم" value={fmt(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
+            <Stat label="ربح اليوم" value={fmtSigned(pnlToday)} className={pnlToday >= 0 ? "text-bull" : "text-bear"} />
           )}
         </div>
 
@@ -199,7 +199,7 @@ function Dashboard() {
               <Row k="الكمية" v={fmt(open.qty, 5)} />
               <Row k="وقف الخسارة" v={fmt(open.stop_price)} cls="text-bear" />
               <Row k="جني الأرباح" v={fmt(open.target_price)} cls="text-bull" />
-              <Row k="الربح غير المحقق" v={`${fmt(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
+              <Row k="الربح غير المحقق" v={`${fmtSigned(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
               <Button
                 variant="destructive"
                 size="sm"
