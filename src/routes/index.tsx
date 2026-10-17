@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
-import { Power, RotateCcw, X, Zap, TrendingUp, TrendingDown } from "lucide-react";
+import { Power, RotateCcw, X, TrendingUp, TrendingDown } from "lucide-react";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { START_BALANCE, useLocalPaper, type LocalSettings } from "@/hooks/use-local-paper";
 import { tradeOutcome } from "@/lib/trade-history";
@@ -27,20 +27,14 @@ export const Route = createFileRoute("/")({
 
 const riskFields: { key: keyof LocalSettings; label: string; min: number; max: number; step: number }[] = [
   { key: "positionUsdt", label: "حجم الصفقة USDT", min: 10, max: 100000, step: 10 },
-  { key: "stopLossPct", label: "وقف الخسارة %", min: 0.05, max: 10, step: 0.05 },
-  { key: "takeProfitPct", label: "جني الأرباح %", min: 0.05, max: 20, step: 0.05 },
   { key: "maxTradesPerDay", label: "أقصى صفقات/يوم", min: 1, max: 500, step: 1 },
   { key: "maxDailyLossUsdt", label: "حد الخسارة اليومي", min: 1, max: 100000, step: 1 },
-  { key: "emaFast", label: "EMA سريع", min: 2, max: 100, step: 1 },
-  { key: "emaSlow", label: "EMA بطيء", min: 3, max: 200, step: 1 },
-  { key: "rsiPeriod", label: "فترة RSI", min: 2, max: 50, step: 1 },
-  { key: "atrSlMult", label: "وقف الخسارة × ATR", min: 0.2, max: 10, step: 0.1 },
-  { key: "atrTpMult", label: "جني الأرباح × ATR", min: 0.2, max: 20, step: 0.1 },
 ];
 
 function Home() {
-  const { klines, connected } = useLiveKlines("BTCUSDT", "1m");
-  const bot = useLocalPaper(klines);
+  const { klines, connected } = useLiveKlines("BTCUSDT", "5m");
+  const { klines: k15 } = useLiveKlines("BTCUSDT", "15m");
+  const bot = useLocalPaper(klines, k15);
   const { settings: s, ind, extras, open, price } = bot;
   const change = price - (klines.at(-2)?.close ?? price);
   const equity = bot.equity;
@@ -48,7 +42,7 @@ function Home() {
   const closed = bot.trades.filter((t) => t.closedAt);
   const wins = closed.filter((t) => (t.pnl ?? 0) > 0).length;
   const openPnl = bot.unrealized;
-  const movePnl = open && price ? (open.side === "short" ? -1 : 1) * (price - open.entry) * open.qty : 0;
+  const movePnl = open && price ? (open.side === "short" ? -1 : 1) * (price - open.entry) * (open.remainingQty ?? open.qty) : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,7 +61,7 @@ function Home() {
           <div className="flex flex-wrap items-end gap-6 rounded-lg border bg-card p-4">
             <div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                BTC/USDT · 1m
+                BTC/USDT · 5m (فلتر 15m)
                 <span className={`h-2 w-2 rounded-full ${connected ? "bg-bull" : "bg-bear"}`} />
                 <span className="text-xs">{connected ? "سوق Binance مباشر" : "جارٍ الاتصال…"}</span>
               </div>
@@ -75,7 +69,7 @@ function Home() {
             </div>
             <Stat label={`EMA ${s.emaFast}`} value={fmt(ind?.emaFast)} cls="text-chart-1" />
             <Stat label={`EMA ${s.emaSlow}`} value={fmt(ind?.emaSlow)} cls="text-chart-2" />
-            <Stat label={`RSI ${s.rsiPeriod}`} value={fmt(ind?.rsi, 1)} />
+            <Stat label="RSI 9" value={fmt(ind?.rsi, 1)} />
             <Stat label="MACD هيستوغرام" value={fmt(extras?.hist)} cls={extras && extras.hist >= 0 ? "text-bull" : "text-bear"} />
             <Stat label="ATR 14" value={fmt(extras?.atr)} />
             <Stat label="الاتجاه" value={ind ? (ind.emaFast > ind.emaSlow ? "صاعد ▲" : "هابط ▼") : "—"} cls={ind && ind.emaFast > ind.emaSlow ? "text-bull" : "text-bear"} />
@@ -92,6 +86,7 @@ function Home() {
             </Suspense>
           </div>
 
+          <ScorePanel sig={bot.signal} />
           <IndicatorsPanel x={extras} />
 
           <div className="rounded-lg border bg-card">
@@ -136,18 +131,6 @@ function Home() {
               <Switch checked={bot.enabled} onCheckedChange={bot.setEnabled} aria-label="تشغيل البوت" />
             </div>
             <StatusBadge tone={bot.status.tone} text={bot.status.text} />
-            <label className="mt-3 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-              <span className="flex items-center gap-2">
-                <Zap className={`h-4 w-4 ${s.fastMode ? "text-primary" : "text-muted-foreground"}`} />
-                سكالبينغ سريع
-                <span className="text-xs text-muted-foreground">(دخول أكثر مرونة)</span>
-              </span>
-              <Switch checked={s.fastMode} onCheckedChange={(v) => bot.updateSettings({ fastMode: v })} aria-label="سكالبينغ سريع" />
-            </label>
-            <label className="mt-2 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-              <span>وقف وهدف ديناميكي حسب ATR</span>
-              <Switch checked={s.useAtr} onCheckedChange={(v) => bot.updateSettings({ useAtr: v })} aria-label="وقف ديناميكي ATR" />
-            </label>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button className="bg-bull text-background hover:bg-bull/90" disabled={!!open || !price} onClick={bot.longNow}>
                 <TrendingUp className="h-4 w-4" /> شراء فوري (Long)
@@ -156,7 +139,7 @@ function Home() {
                 <TrendingDown className="h-4 w-4" /> بيع فوري (Short)
               </Button>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">يتداول البوت طالما الصفحة مفتوحة، ويقرر عند إغلاق كل شمعة دقيقة.</p>
+            <p className="mt-2 text-xs text-muted-foreground">يتداول البوت طالما الصفحة مفتوحة، ويقرر عند إغلاق كل شمعة 5 دقائق.</p>
           </div>
 
           <div className="rounded-lg border bg-card p-4">
@@ -180,7 +163,8 @@ function Home() {
               <div className="space-y-1 text-sm">
                 <Row k="الدخول" v={fmt(open.entry)} />
                 <Row k="وقف الخسارة" v={fmt(open.stop)} cls="text-bear" />
-                <Row k="جني الأرباح" v={fmt(open.target)} cls="text-bull" />
+                {open.tp1 != null && <Row k={`الهدف الأول (60%)${open.tp1Hit ? " ✓" : ""}`} v={fmt(open.tp1)} cls="text-bull" />}
+                <Row k="الهدف الثاني (40%)" v={fmt(open.target)} cls="text-bull" />
                 <Row k="ربح/خسارة السعر" v={`${fmtSigned(movePnl)} USDT`} cls={movePnl >= 0 ? "text-bull" : "text-bear"} />
                 <Row k="الصافي بعد السبريد" v={`${fmtSigned(openPnl)} USDT`} cls={openPnl >= 0 ? "text-bull" : "text-bear"} />
                 <Button variant="destructive" size="sm" className="mt-2 w-full" onClick={bot.closeNow}>
@@ -203,7 +187,7 @@ function RiskPanel({ settings, onSave }: { settings: LocalSettings; onSave: (p: 
   const [draft, setDraft] = useState<Record<string, string>>({});
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="mb-3 text-sm font-semibold">إدارة المخاطر والمؤشرات</div>
+      <div className="mb-3 text-sm font-semibold">إدارة المخاطر</div>
       <div className="grid grid-cols-2 gap-2">
         {riskFields.map((f) => (
           <label key={f.key} className="text-xs text-muted-foreground">
@@ -317,6 +301,29 @@ function Row({ k, v, cls = "" }: { k: string; v: string; cls?: string }) {
     <div className="flex justify-between">
       <span className="text-muted-foreground">{k}</span>
       <span className={`num ${cls}`}>{v}</span>
+    </div>
+  );
+}
+
+function ScorePanel({ sig }: { sig: ReturnType<typeof useLocalPaper>["signal"] }) {
+  if (!sig) return null;
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-medium">Smart VWAP & Momentum — نقاط الدخول</span>
+        <span className={`num rounded px-2 py-0.5 text-xs ${sig.score >= 80 ? "bg-bull/15 text-bull" : "bg-muted text-muted-foreground"}`}>{sig.score}% / 80%</span>
+      </div>
+      <div className="grid gap-1.5 text-xs sm:grid-cols-2">
+        {sig.checks.map((c) => (
+          <div key={c.key} className="flex items-center justify-between rounded bg-muted/50 px-2 py-1.5">
+            <span>{c.label} <span className="text-muted-foreground">({c.weight}%)</span></span>
+            <span className="flex gap-2">
+              <span className={c.long ? "text-bull" : "text-muted-foreground"}>L {c.long ? "✓" : "✗"}</span>
+              <span className={c.short ? "text-bear" : "text-muted-foreground"}>S {c.short ? "✓" : "✗"}</span>
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
