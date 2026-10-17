@@ -62,7 +62,7 @@ function Home() {
       </header>
 
       <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_340px]">
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-end gap-6 rounded-lg border bg-card p-4">
             <div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ function Home() {
           </div>
         </section>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold">
