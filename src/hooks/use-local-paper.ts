@@ -4,7 +4,7 @@ import { prependTrade, tradeOutcome } from "@/lib/trade-history";
 import type { Kline } from "@/lib/binance";
 import { computeExtras, computeIndicators, riskGate, sidePnl, type Side, type StrategyParams } from "@/lib/trading";
 import {
-  SMART, breakevenStop, inCooldown, smartBracket, smartCandleExit, smartSignal, type SmartSignal,
+  SMART, breakevenStop, inCooldown, inRolloverWindow, smartBracket, smartCandleExit, smartSignal, type SmartSignal,
 } from "@/lib/smart-scalp";
 
 // Guest futures-style paper engine running Smart VWAP & Momentum Scalping (5m + 15m) on live prices; state in localStorage.
@@ -175,6 +175,7 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[]) {
   else {
     const g = gate();
     if (!g.ok) status = { tone: "blocked", text: `متوقف عن الدخول — ${g.reason}` };
+    else if (inRolloverWindow(Date.now())) status = { tone: "blocked", text: "إيقاف وقت إغلاق/افتتاح الذهب (23:00–01:00 UTC)" };
     else if (inCooldown(lastStopAt, Date.now())) status = { tone: "blocked", text: "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
     else if (signal.side) status = { tone: "ready", text: signal.reason };
     else status = { tone: "watch", text: signal.reason };
@@ -205,7 +206,7 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[]) {
       if (r) close(r);
       return;
     }
-    if (!st.enabled || !signal?.side || !gate().ok || inCooldown(lastStopAt, Date.now())) return;
+    if (!st.enabled || !signal?.side || !gate().ok || inRolloverWindow(Date.now()) || inCooldown(lastStopAt, Date.now())) return;
     openTrade(signal.side, signal.reason);
   }, [closedCount, signal, loaded, st.enabled]);
 
