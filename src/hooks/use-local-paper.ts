@@ -130,7 +130,7 @@ export function useLocalPaper(klines: Kline[]) {
     }
     const s = st.settings;
     const br = sideBracket(side, price, {
-      atr: s.useAtr ? extras?.atr : null,
+      atr: s.useAtr ? (extras?.atr ?? null) : null,
       slMult: s.atrSlMult,
       tpMult: s.atrTpMult,
       slPct: s.stopLossPct,
