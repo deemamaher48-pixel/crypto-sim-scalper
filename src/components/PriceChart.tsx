@@ -35,7 +35,7 @@ export default function PriceChart({
   klines: Kline[];
   emaFast: number;
   emaSlow: number;
-  levels?: { entry: number; stop: number; target: number } | null;
+  levels?: { entry: number; stop: number; target: number; side?: "long" | "short" } | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
@@ -94,8 +94,14 @@ export default function PriceChart({
     lines.current = [];
     if (levels) {
       lines.current.push(
-        s.createPriceLine({ price: levels.entry, color: cssColor("--primary"), lineWidth: 1, lineStyle: 2, title: "دخول" }),
-        s.createPriceLine({ price: levels.stop, color: cssColor("--bear"), lineWidth: 1, lineStyle: 2, title: "SL" }),
+        s.createPriceLine({
+          price: levels.entry,
+          color: cssColor(levels.side === "short" ? "--bear" : "--bull"),
+          lineWidth: 2,
+          lineStyle: 0,
+          title: levels.side === "short" ? "Short ▼" : "Long ▲",
+        }),
+        s.createPriceLine({ price: levels.stop, color: cssColor("--destructive"), lineWidth: 1, lineStyle: 2, title: "SL" }),
         s.createPriceLine({ price: levels.target, color: cssColor("--bull"), lineWidth: 1, lineStyle: 2, title: "TP" }),
       );
     }

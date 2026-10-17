@@ -71,3 +71,57 @@ describe("fast scalping mode", () => {
     expect(fastEntrySignal({ ...uptrend, rsi: 75 }, p).buy).toBe(false);
   });
 });
+
+import { atr, macd, sideBracket, sideExit, sidePnl } from "./trading";
+describe("long & short", () => {
+  it("short profits when price falls, net of 0.1% fees per side", () => {
+    expect(sidePnl("short", 1, 100, 90)).toBeCloseTo(10 - 0.19);
+    expect(sidePnl("long", 1, 100, 90)).toBeCloseTo(-10 - 0.19);
+  });
+  it("short stop is above entry and target below, sized by ATR", () => {
+    const b = sideBracket("short", 100, { atr: 2, slMult: 1.5, tpMult: 2.5, slPct: 0.5, tpPct: 1 });
+    expect(b.stop).toBe(103);
+    expect(b.target).toBe(95);
+  });
+  it("falls back to fixed percentages without ATR", () => {
+    const b = sideBracket("long", 100, { atr: null, slMult: 1.5, tpMult: 2.5, slPct: 0.5, tpPct: 1 });
+    expect(b.stop).toBeCloseTo(99.5);
+    expect(b.target).toBeCloseTo(101);
+  });
+  it("short hits stop loss when price rises to stop", () => {
+    expect(sideExit(103, { side: "short", stop: 103, target: 95 }, null)).toBe("stop_loss");
+    expect(sideExit(95, { side: "short", stop: 103, target: 95 }, null)).toBe("take_profit");
+  });
+  it("computes MACD and ATR", () => {
+    const up = Array.from({ length: 60 }, (_, i) => 100 + i);
+    expect(macd(up).line[59]).toBeGreaterThan(0);
+    const c = Array.from({ length: 20 }, () => ({ high: 102, low: 98, close: 100 }));
+    expect(atr(c, 14)[19]).toBeCloseTo(4);
+  });
+});
+
+import { adx, bollinger, stochastic, vwap, twoWaySignal } from "./trading";
+describe("extra indicators", () => {
+  it("stochastic is 100 at the top of the range", () => {
+    const c = Array.from({ length: 20 }, (_, i) => ({ high: 100 + i, low: 90 + i, close: 100 + i }));
+    expect(stochastic(c, 14).k[19]).toBe(100);
+  });
+  it("bollinger bands collapse on flat prices", () => {
+    const b = bollinger(Array(25).fill(50), 20, 2);
+    expect(b.upper[24]).toBe(50);
+    expect(b.lower[24]).toBe(50);
+  });
+  it("vwap weights price by volume", () => {
+    expect(vwap([{ high: 10, low: 10, close: 10, volume: 1, time: 0 }, { high: 20, low: 20, close: 20, volume: 3, time: 60 }])).toBe(17.5);
+  });
+  it("adx is high in a strong steady trend", () => {
+    const c = Array.from({ length: 60 }, (_, i) => ({ high: 101 + i, low: 99 + i, close: 100.5 + i }));
+    expect(adx(c).adx[59]).toBeGreaterThan(40);
+  });
+  it("in a ranging market (ADX < 20) shorts the upper band when Stochastic > 80", () => {
+    const p = { emaFast: 9, emaSlow: 21, rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30 };
+    const ind = { emaFast: 101, emaSlow: 100, rsi: 60, prevEmaFast: 101, prevEmaSlow: 100, prevRsi: 60 };
+    const x = { macd: 0, macdSignal: 0, hist: 1, atr: 1, stochK: 85, stochD: 80, bbUpper: 105, bbMid: 100, bbLower: 95, bbWidthPct: 10, vwap: 100, adx: 15, plusDi: 20, minusDi: 20, ema50: 100, ema200: 100, close: 105 };
+    expect(twoWaySignal(ind, x, p, false).side).toBe("short");
+  });
+});

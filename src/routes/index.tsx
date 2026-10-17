@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useState } from "react";
-import { Power, RotateCcw, X, Zap, FlaskConical } from "lucide-react";
+import { Power, RotateCcw, X, Zap, TrendingUp, TrendingDown } from "lucide-react";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { START_BALANCE, useLocalPaper, type LocalSettings } from "@/hooks/use-local-paper";
 import { exitReasonLabel } from "@/lib/trading";
@@ -34,18 +34,20 @@ const riskFields: { key: keyof LocalSettings; label: string; min: number; max: n
   { key: "emaFast", label: "EMA سريع", min: 2, max: 100, step: 1 },
   { key: "emaSlow", label: "EMA بطيء", min: 3, max: 200, step: 1 },
   { key: "rsiPeriod", label: "فترة RSI", min: 2, max: 50, step: 1 },
+  { key: "atrSlMult", label: "وقف الخسارة × ATR", min: 0.2, max: 10, step: 0.1 },
+  { key: "atrTpMult", label: "جني الأرباح × ATR", min: 0.2, max: 20, step: 0.1 },
 ];
 
 function Home() {
   const { klines, connected } = useLiveKlines("BTCUSDT", "1m");
   const bot = useLocalPaper(klines);
-  const { settings: s, ind, open, price } = bot;
+  const { settings: s, ind, extras, open, price } = bot;
   const change = price - (klines.at(-2)?.close ?? price);
-  const equity = bot.usdt + bot.btc * price;
+  const equity = bot.equity;
   const totalPnl = equity - START_BALANCE;
   const closed = bot.trades.filter((t) => t.closedAt);
   const wins = closed.filter((t) => (t.pnl ?? 0) > 0).length;
-  const openPnl = open ? (price - open.entry) * open.qty : 0;
+  const openPnl = bot.unrealized;
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,6 +75,8 @@ function Home() {
             <Stat label={`EMA ${s.emaFast}`} value={fmt(ind?.emaFast)} cls="text-chart-1" />
             <Stat label={`EMA ${s.emaSlow}`} value={fmt(ind?.emaSlow)} cls="text-chart-2" />
             <Stat label={`RSI ${s.rsiPeriod}`} value={fmt(ind?.rsi, 1)} />
+            <Stat label="MACD هيستوغرام" value={fmt(extras?.hist)} cls={extras && extras.hist >= 0 ? "text-bull" : "text-bear"} />
+            <Stat label="ATR 14" value={fmt(extras?.atr)} />
             <Stat label="الاتجاه" value={ind ? (ind.emaFast > ind.emaSlow ? "صاعد ▲" : "هابط ▼") : "—"} cls={ind && ind.emaFast > ind.emaSlow ? "text-bull" : "text-bear"} />
           </div>
 
@@ -82,10 +86,12 @@ function Home() {
                 klines={klines}
                 emaFast={s.emaFast}
                 emaSlow={s.emaSlow}
-                levels={open ? { entry: open.entry, stop: open.stop, target: open.target } : null}
+                levels={open ? { entry: open.entry, stop: open.stop, target: open.target, side: open.side } : null}
               />
             </Suspense>
           </div>
+
+          <IndicatorsPanel x={extras} />
 
           <div className="rounded-lg border bg-card">
             <div className="flex items-center justify-between border-b px-4 py-2 text-sm">
@@ -98,20 +104,21 @@ function Home() {
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b">
-                    {["الوقت", "الدخول", "الخروج", "الربح", "السبب"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
+                    {["الوقت", "الاتجاه", "الدخول", "الخروج", "الربح", "السبب"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {bot.trades.map((t) => (
                     <tr key={t.id} className="border-b last:border-0">
                       <td className="num px-3 py-2 text-xs">{new Date(t.openedAt).toLocaleTimeString("en-GB")}</td>
+                      <td className="px-3 py-2"><SideTag side={t.side} /></td>
                       <td className="num px-3 py-2">{fmt(t.entry)}</td>
                       <td className="num px-3 py-2">{fmt(t.exit)}</td>
                       <td className={`num px-3 py-2 ${t.pnl == null ? "" : t.pnl >= 0 ? "text-bull" : "text-bear"}`}>{t.closedAt ? fmt(t.pnl) : "مفتوحة"}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{t.exitReason ? exitReasonLabel[t.exitReason] : t.entryReason}</td>
                     </tr>
                   ))}
-                  {bot.trades.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">شغّل البوت لتبدأ الصفقات.</td></tr>}
+                  {bot.trades.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">شغّل البوت لتبدأ الصفقات.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -136,9 +143,18 @@ function Home() {
               </span>
               <Switch checked={s.fastMode} onCheckedChange={(v) => bot.updateSettings({ fastMode: v })} aria-label="سكالبينغ سريع" />
             </label>
-            <Button variant="secondary" className="mt-3 w-full" disabled={!!open || !price} onClick={bot.buyNow}>
-              <FlaskConical className="h-4 w-4" /> تجربة صفقة فورية (شراء تجريبي)
-            </Button>
+            <label className="mt-2 flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+              <span>وقف وهدف ديناميكي حسب ATR</span>
+              <Switch checked={s.useAtr} onCheckedChange={(v) => bot.updateSettings({ useAtr: v })} aria-label="وقف ديناميكي ATR" />
+            </label>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button className="bg-bull text-background hover:bg-bull/90" disabled={!!open || !price} onClick={bot.longNow}>
+                <TrendingUp className="h-4 w-4" /> شراء فوري (Long)
+              </Button>
+              <Button className="bg-bear text-background hover:bg-bear/90" disabled={!!open || !price} onClick={bot.shortNow}>
+                <TrendingDown className="h-4 w-4" /> بيع فوري (Short)
+              </Button>
+            </div>
             <p className="mt-2 text-xs text-muted-foreground">يتداول البوت طالما الصفحة مفتوحة، ويقرر عند إغلاق كل شمعة دقيقة.</p>
           </div>
 
@@ -150,15 +166,15 @@ function Home() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Stat label="USDT" value={fmt(bot.usdt)} />
-              <Stat label="BTC" value={fmt(bot.btc, 5)} />
+              <Stat label="USDT متاح" value={fmt(bot.usdt)} />
+              <Stat label="هامش مستخدم" value={fmt(open?.size ?? 0)} />
               <Stat label="القيمة الكلية" value={fmt(equity)} />
               <Stat label="إجمالي الربح" value={fmt(totalPnl)} cls={totalPnl >= 0 ? "text-bull" : "text-bear"} />
             </div>
           </div>
 
           <div className="rounded-lg border bg-card p-4">
-            <div className="mb-3 text-sm font-semibold">الصفقة المفتوحة</div>
+            <div className="mb-3 flex items-center justify-between text-sm font-semibold">الصفقة المفتوحة {open && <SideTag side={open.side} />}</div>
             {open ? (
               <div className="space-y-1 text-sm">
                 <Row k="الدخول" v={fmt(open.entry)} />
@@ -215,6 +231,55 @@ const toneCls = {
   open: "border-primary/40 bg-primary/10 text-primary",
   blocked: "border-bear/40 bg-bear/10 text-bear",
 } as const;
+
+function IndicatorsPanel({ x }: { x: ReturnType<typeof useLocalPaper>["extras"] }) {
+  if (!x) return null;
+  const trending = x.adx >= 20;
+  const items: { group: string; label: string; value: string; note: string; cls?: string }[] = [
+    { group: "الزخم", label: "Stochastic %K / %D", value: `${fmt(x.stochK, 0)} / ${fmt(x.stochD, 0)}`,
+      note: x.stochK > 80 ? "تشبع شرائي" : x.stochK < 20 ? "تشبع بيعي" : "محايد",
+      cls: x.stochK > 80 ? "text-bear" : x.stochK < 20 ? "text-bull" : "" },
+    { group: "التقلب", label: "Bollinger (عرض الباند)", value: `${fmt(x.bbWidthPct, 2)}%`,
+      note: x.close >= x.bbUpper ? "فوق الباند العلوي" : x.close <= x.bbLower ? "تحت الباند السفلي" : x.bbWidthPct < 0.15 ? "انضغاط — احتمال انفجار" : "داخل الباندات" },
+    { group: "التقلب", label: "ATR 14", value: fmt(x.atr), note: "يحدد مسافة الوقف والهدف" },
+    { group: "السيولة", label: "VWAP اليومي", value: fmt(x.vwap), note: x.close >= x.vwap ? "السعر فوق VWAP" : "السعر تحت VWAP",
+      cls: x.close >= x.vwap ? "text-bull" : "text-bear" },
+    { group: "الاتجاه", label: "MACD / الإشارة", value: `${fmt(x.macd)} / ${fmt(x.macdSignal)}`, note: x.hist >= 0 ? "زخم صاعد" : "زخم هابط",
+      cls: x.hist >= 0 ? "text-bull" : "text-bear" },
+    { group: "الاتجاه", label: "EMA 50 / 200", value: `${fmt(x.ema50, 0)} / ${fmt(x.ema200, 0)}`,
+      note: !Number.isFinite(x.ema200) ? "—" : x.ema50 > x.ema200 ? "ترند عام صاعد" : "ترند عام هابط",
+      cls: x.ema50 > x.ema200 ? "text-bull" : "text-bear" },
+    { group: "القوة", label: "ADX (+DI / −DI)", value: `${fmt(x.adx, 0)} (${fmt(x.plusDi, 0)} / ${fmt(x.minusDi, 0)})`,
+      note: trending ? "ترند قوي — استراتيجية تتبع الاتجاه" : "سوق عرضي — استراتيجية النطاق", cls: trending ? "text-primary" : "text-chart-2" },
+  ];
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between text-sm">
+        <span className="font-medium">لوحة المؤشرات</span>
+        <span className={`rounded px-2 py-0.5 text-xs ${trending ? "bg-primary/15 text-primary" : "bg-chart-2/15 text-chart-2"}`}>
+          الاستراتيجية الحالية: {trending ? "تتبع الاتجاه" : "تداول النطاق"}
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((i) => (
+          <div key={i.label} className="rounded-md bg-muted/50 p-3">
+            <div className="text-[11px] text-muted-foreground">{i.group} · {i.label}</div>
+            <div className={`num mt-1 font-semibold ${i.cls ?? ""}`}>{i.value}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{i.note}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SideTag({ side }: { side: "long" | "short" }) {
+  return (
+    <span className={`rounded px-2 py-0.5 text-xs font-medium ${side === "long" ? "bg-bull/15 text-bull" : "bg-bear/15 text-bear"}`}>
+      {side === "long" ? "Long ▲" : "Short ▼"}
+    </span>
+  );
+}
 
 function StatusBadge({ tone, text }: { tone: keyof typeof toneCls; text: string }) {
   return (
