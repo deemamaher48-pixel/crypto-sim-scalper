@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { KeyRound, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsQuery, type Settings } from "@/lib/queries";
-import { deleteCredentials, getCredentialStatus, resetPaperAccount, saveCredentials } from "@/server/bot.functions";
+import { deleteCredentials, getCredentialStatus, resetPaperAccount, saveCredentials } from "@/functions/bot.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

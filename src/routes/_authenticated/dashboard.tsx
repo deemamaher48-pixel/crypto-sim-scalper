@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { computeIndicators, entrySignal } from "@/lib/trading";
 import { fmt, settingsQuery, tradesQuery } from "@/lib/queries";
-import { closeTradeNow, runBotTick } from "@/server/bot.functions";
+import { closeTradeNow, runBotTick } from "@/functions/bot.functions";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 

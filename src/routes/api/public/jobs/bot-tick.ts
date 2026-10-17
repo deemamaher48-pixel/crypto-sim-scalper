@@ -9,7 +9,7 @@ export const Route = createFileRoute("/api/public/jobs/bot-tick")({
         const authFailure = await authenticateCronRequest(request);
         if (authFailure) return authFailure;
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { tickUser } = await import("@/server/bot.functions");
+        const { tickUser } = await import("@/functions/bot.functions");
         const [{ data: enabled }, { data: open }] = await Promise.all([
           supabaseAdmin.from("bot_settings").select("user_id").eq("enabled", true),
           supabaseAdmin.from("trades").select("user_id").eq("status", "open"),
