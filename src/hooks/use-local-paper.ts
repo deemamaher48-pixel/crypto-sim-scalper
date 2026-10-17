@@ -116,7 +116,7 @@ export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, 
       const part = sidePnl(t.side, q, t.entry, at);
       const pnl = (t.realized ?? 0) + part;
       toast[pnl > 0 ? "success" : pnl < 0 ? "error" : "message"](tradeOutcome(pnl));
-      let paused = s.sniperPausedUntil;
+      let paused = s.sniperPausedUntil ?? 0;
       if (t.mode === "sniper") {
         const recent = [pnl, ...s.trades.filter((x) => x.mode === "sniper" && x.closedAt && x.id !== t.id && Date.parse(x.closedAt) >= (s.sniperResetAt ?? 0)).map((x) => x.pnl ?? 0)];
         if (breakerTripped(recent)) {
