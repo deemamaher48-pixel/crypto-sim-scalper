@@ -4,7 +4,7 @@ import { adx, atr, ema, macd, rsi, sma, vwap, PAPER_FEE, type Side } from "@/lib
 export type Bar = { time: number; open: number; high: number; low: number; close: number; volume: number };
 
 export const SMART = {
-  minScore: 80,
+  minScore: 75,
   volMult: 1.4,
   spikeAtr: 2.5,
   slMinUsd: 1.5,
@@ -61,7 +61,7 @@ export function smartSignal(c5: Bar[], c15: Bar[]): SmartSignal | null {
   const tag = side === "long" ? "Long" : "Short";
   if (!checks[0]![side]) return { ...base, side: null, reason: `يراقب — شرط اتجاه VWAP غير محقق (${best}%)` };
   if (!checks[1]![side]) return { ...base, side: null, reason: `يراقب — لا سيولة كافية أو شمعة ضعيفة (${best}%)` };
-  if (best < SMART.minScore) return { ...base, side: null, reason: `يراقب — نقاط ${tag} ${best}% أقل من 80%` };
+  if (best < SMART.minScore) return { ...base, side: null, reason: `يراقب — نقاط ${tag} ${best}% أقل من 75%` };
   if (range > SMART.spikeAtr * a)
     return { ...base, side: null, reason: "فلتر الأخبار — شمعة انفجارية أطول من 2.5×ATR" };
   if (Math.abs(bar.close - v5) > SMART.maxVwapAtr * a)

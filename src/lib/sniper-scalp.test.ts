@@ -10,16 +10,17 @@ describe("1m sniper", () => {
     expect(b.tp1).toBeCloseTo(1998.8);
     expect(b.target).toBeCloseTo(1997.5);
   });
-  it("fast breakeven only after 0.8×ATR in favour", () => {
-    expect(fastBreakeven("long", 2000, 2000.7, 1)).toBeNull();
-    expect(fastBreakeven("long", 2000, 2000.8, 1)!).toBeGreaterThan(2000);
+  it("fast breakeven only after 1.0×ATR in favour", () => {
+    expect(fastBreakeven("long", 2000, 2000.9, 1)).toBeNull();
+    expect(fastBreakeven("long", 2000, 2001, 1)!).toBeGreaterThan(2000);
   });
-  it("cooldown lasts 5 minutes", () => {
-    expect(sniperCooldown(0, 4 * 60_000)).toBe(true);
-    expect(sniperCooldown(0, 5 * 60_000)).toBe(false);
+  it("cooldown lasts 2 minutes", () => {
+    expect(sniperCooldown(0, 1 * 60_000)).toBe(true);
+    expect(sniperCooldown(0, 2 * 60_000)).toBe(false);
   });
-  it("circuit breaker trips on two consecutive losses", () => {
-    expect(breakerTripped([-1, -2])).toBe(true);
-    expect(breakerTripped([-1, 2, -3])).toBe(false);
+  it("circuit breaker trips on three consecutive losses", () => {
+    expect(breakerTripped([-1, -2])).toBe(false);
+    expect(breakerTripped([-1, -2, -3])).toBe(true);
+    expect(breakerTripped([-1, -2, 3])).toBe(false);
   });
 });
