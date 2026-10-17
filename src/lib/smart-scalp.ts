@@ -80,10 +80,11 @@ export function inRolloverWindow(ms: number) {
   return h >= 23 || h < 1;
 }
 
-/** SL 1.5×ATR clamped to $1.5–$4 (gold), TP1 1.5×ATR, TP2 3×ATR. */
-export function smartBracket(side: Side, entry: number, a: number) {
+/** SL 1.5×ATR (clamped to $1.5–$4 for gold only), TP1 1.5×ATR, TP2 3×ATR. */
+export function smartBracket(side: Side, entry: number, a: number, gold = true) {
   const d = side === "long" ? 1 : -1;
-  const sl = Math.min(Math.max(SMART.slAtr * a, SMART.slMinUsd), SMART.slMaxUsd);
+  const raw = SMART.slAtr * a;
+  const sl = gold ? Math.min(Math.max(raw, SMART.slMinUsd), SMART.slMaxUsd) : raw;
   return { stop: entry - d * sl, tp1: entry + d * SMART.tp1Atr * a, target: entry + d * SMART.tp2Atr * a };
 }
 
