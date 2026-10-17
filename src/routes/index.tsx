@@ -91,6 +91,8 @@ function Home() {
             </Suspense>
           </div>
 
+          <IndicatorsPanel x={extras} />
+
           <div className="rounded-lg border bg-card">
             <div className="flex items-center justify-between border-b px-4 py-2 text-sm">
               <span className="font-medium">سجل الصفقات</span>
@@ -229,6 +231,47 @@ const toneCls = {
   open: "border-primary/40 bg-primary/10 text-primary",
   blocked: "border-bear/40 bg-bear/10 text-bear",
 } as const;
+
+function IndicatorsPanel({ x }: { x: ReturnType<typeof useLocalPaper>["extras"] }) {
+  if (!x) return null;
+  const trending = x.adx >= 20;
+  const items: { group: string; label: string; value: string; note: string; cls?: string }[] = [
+    { group: "الزخم", label: "Stochastic %K / %D", value: `${fmt(x.stochK, 0)} / ${fmt(x.stochD, 0)}`,
+      note: x.stochK > 80 ? "تشبع شرائي" : x.stochK < 20 ? "تشبع بيعي" : "محايد",
+      cls: x.stochK > 80 ? "text-bear" : x.stochK < 20 ? "text-bull" : "" },
+    { group: "التقلب", label: "Bollinger (عرض الباند)", value: `${fmt(x.bbWidthPct, 2)}%`,
+      note: x.close >= x.bbUpper ? "فوق الباند العلوي" : x.close <= x.bbLower ? "تحت الباند السفلي" : x.bbWidthPct < 0.15 ? "انضغاط — احتمال انفجار" : "داخل الباندات" },
+    { group: "التقلب", label: "ATR 14", value: fmt(x.atr), note: "يحدد مسافة الوقف والهدف" },
+    { group: "السيولة", label: "VWAP اليومي", value: fmt(x.vwap), note: x.close >= x.vwap ? "السعر فوق VWAP" : "السعر تحت VWAP",
+      cls: x.close >= x.vwap ? "text-bull" : "text-bear" },
+    { group: "الاتجاه", label: "MACD / الإشارة", value: `${fmt(x.macd)} / ${fmt(x.macdSignal)}`, note: x.hist >= 0 ? "زخم صاعد" : "زخم هابط",
+      cls: x.hist >= 0 ? "text-bull" : "text-bear" },
+    { group: "الاتجاه", label: "EMA 50 / 200", value: `${fmt(x.ema50, 0)} / ${fmt(x.ema200, 0)}`,
+      note: !Number.isFinite(x.ema200) ? "—" : x.ema50 > x.ema200 ? "ترند عام صاعد" : "ترند عام هابط",
+      cls: x.ema50 > x.ema200 ? "text-bull" : "text-bear" },
+    { group: "القوة", label: "ADX (+DI / −DI)", value: `${fmt(x.adx, 0)} (${fmt(x.plusDi, 0)} / ${fmt(x.minusDi, 0)})`,
+      note: trending ? "ترند قوي — استراتيجية تتبع الاتجاه" : "سوق عرضي — استراتيجية النطاق", cls: trending ? "text-primary" : "text-chart-2" },
+  ];
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between text-sm">
+        <span className="font-medium">لوحة المؤشرات</span>
+        <span className={`rounded px-2 py-0.5 text-xs ${trending ? "bg-primary/15 text-primary" : "bg-chart-2/15 text-chart-2"}`}>
+          الاستراتيجية الحالية: {trending ? "تتبع الاتجاه" : "تداول النطاق"}
+        </span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((i) => (
+          <div key={i.label} className="rounded-md bg-muted/50 p-3">
+            <div className="text-[11px] text-muted-foreground">{i.group} · {i.label}</div>
+            <div className={`num mt-1 font-semibold ${i.cls ?? ""}`}>{i.value}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{i.note}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function SideTag({ side }: { side: "long" | "short" }) {
   return (

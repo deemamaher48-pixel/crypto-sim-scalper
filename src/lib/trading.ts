@@ -219,7 +219,11 @@ export function bollinger(values: number[], period = 20, mult = 2) {
   const upper: number[] = [];
   const lower: number[] = [];
   values.forEach((_, i) => {
-    if (!Number.isFinite(mid[i]!)) return upper.push(NaN), lower.push(NaN);
+    if (!Number.isFinite(mid[i]!)) {
+      upper.push(NaN);
+      lower.push(NaN);
+      return;
+    }
     const w = values.slice(i - period + 1, i + 1);
     const sd = Math.sqrt(w.reduce((a, v) => a + (v - mid[i]!) ** 2, 0) / period);
     upper.push(mid[i]! + mult * sd);
