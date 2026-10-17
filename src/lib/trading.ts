@@ -162,7 +162,7 @@ export function fastEntrySignal(ind: Indicators, p: StrategyParams): { buy: bool
 
 // ---------- Two-way (futures-style) paper trading ----------
 export type Side = "long" | "short";
-export type Candle = { high: number; low: number; close: number };
+export type Candle = { high: number; low: number; close: number; volume?: number; time?: number };
 
 export function macd(values: number[], fast = 12, slow = 26, signal = 9) {
   const f = ema(values, fast);
@@ -193,14 +193,118 @@ export function atr(c: Candle[], period = 14): number[] {
   return out;
 }
 
-export type Extras = { macd: number; macdSignal: number; hist: number; atr: number };
-export function computeExtras(c: Candle[], atrPeriod = 14): Extras | null {
-  const m = macd(c.map((k) => k.close));
-  const a = atr(c, atrPeriod);
-  const n = c.length - 1;
-  const v = { macd: m.line[n]!, macdSignal: m.signal[n]!, hist: m.hist[n]!, atr: a[n]! };
-  return n > 0 && Object.values(v).every(Number.isFinite) ? v : null;
+export function sma(values: number[], period: number): number[] {
+  return values.map((_, i) =>
+    i < period - 1 ? NaN : values.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period,
+  );
 }
+
+/** Stochastic %K (raw) and %D (SMA of %K). */
+export function stochastic(c: Candle[], period = 14, dPeriod = 3) {
+  const k = c.map((_, i) => {
+    if (i < period - 1) return NaN;
+    const w = c.slice(i - period + 1, i + 1);
+    const hi = Math.max(...w.map((x) => x.high));
+    const lo = Math.min(...w.map((x) => x.low));
+    return hi === lo ? 50 : ((c[i]!.close - lo) / (hi - lo)) * 100;
+  });
+  const start = k.findIndex(Number.isFinite);
+  const d: number[] = new Array(c.length).fill(NaN);
+  if (start >= 0) sma(k.slice(start), dPeriod).forEach((v, i) => (d[start + i] = v));
+  return { k, d };
+}
+
+export function bollinger(values: number[], period = 20, mult = 2) {
+  const mid = sma(values, period);
+  const upper: number[] = [];
+  const lower: number[] = [];
+  values.forEach((_, i) => {
+    if (!Number.isFinite(mid[i]!)) return upper.push(NaN), lower.push(NaN);
+    const w = values.slice(i - period + 1, i + 1);
+    const sd = Math.sqrt(w.reduce((a, v) => a + (v - mid[i]!) ** 2, 0) / period);
+    upper.push(mid[i]! + mult * sd);
+    lower.push(mid[i]! - mult * sd);
+  });
+  return { mid, upper, lower };
+}
+
+/** VWAP anchored at the start of the current UTC day (falls back to all candles given). */
+export function vwap(c: Candle[]): number {
+  const last = c.at(-1)?.time;
+  const dayStart = last ? Math.floor(last / 86400) * 86400 : -Infinity;
+  let pv = 0;
+  let vol = 0;
+  for (const k of c) {
+    if ((k.time ?? 0) < dayStart) continue;
+    const v = k.volume ?? 0;
+    pv += ((k.high + k.low + k.close) / 3) * v;
+    vol += v;
+  }
+  return vol > 0 ? pv / vol : NaN;
+}
+
+/** Wilder ADX with +DI / -DI. */
+export function adx(c: Candle[], period = 14) {
+  const n = c.length;
+  const out = { adx: new Array(n).fill(NaN) as number[], plusDi: new Array(n).fill(NaN) as number[], minusDi: new Array(n).fill(NaN) as number[] };
+  if (n < period * 2 + 1) return out;
+  let tr = 0, pdm = 0, mdm = 0;
+  const dx: number[] = [];
+  for (let i = 1; i < n; i++) {
+    const k = c[i]!, p = c[i - 1]!;
+    const up = k.high - p.high;
+    const down = p.low - k.low;
+    const t = Math.max(k.high - k.low, Math.abs(k.high - p.close), Math.abs(k.low - p.close));
+    const pm = up > down && up > 0 ? up : 0;
+    const mm = down > up && down > 0 ? down : 0;
+    if (i <= period) {
+      tr += t; pdm += pm; mdm += mm;
+      if (i < period) continue;
+    } else {
+      tr = tr - tr / period + t;
+      pdm = pdm - pdm / period + pm;
+      mdm = mdm - mdm / period + mm;
+    }
+    const pdi = tr ? (100 * pdm) / tr : 0;
+    const mdi = tr ? (100 * mdm) / tr : 0;
+    out.plusDi[i] = pdi;
+    out.minusDi[i] = mdi;
+    dx.push(pdi + mdi ? (100 * Math.abs(pdi - mdi)) / (pdi + mdi) : 0);
+    if (dx.length === period) out.adx[i] = dx.reduce((a, b) => a + b, 0) / period;
+    else if (dx.length > period) out.adx[i] = (out.adx[i - 1]! * (period - 1) + dx.at(-1)!) / period;
+  }
+  return out;
+}
+
+export type Extras = {
+  macd: number; macdSignal: number; hist: number; atr: number;
+  stochK: number; stochD: number;
+  bbUpper: number; bbMid: number; bbLower: number; bbWidthPct: number;
+  vwap: number; adx: number; plusDi: number; minusDi: number;
+  ema50: number; ema200: number; close: number;
+};
+export function computeExtras(c: Candle[], atrPeriod = 14): Extras | null {
+  const closes = c.map((k) => k.close);
+  const m = macd(closes);
+  const a = atr(c, atrPeriod);
+  const st = stochastic(c);
+  const bb = bollinger(closes);
+  const dx = adx(c);
+  const n = c.length - 1;
+  if (n < 1) return null;
+  const core = { macd: m.line[n]!, macdSignal: m.signal[n]!, hist: m.hist[n]!, atr: a[n]! };
+  if (!Object.values(core).every(Number.isFinite)) return null;
+  return {
+    ...core,
+    stochK: st.k[n]!, stochD: st.d[n]!,
+    bbUpper: bb.upper[n]!, bbMid: bb.mid[n]!, bbLower: bb.lower[n]!,
+    bbWidthPct: ((bb.upper[n]! - bb.lower[n]!) / bb.mid[n]!) * 100,
+    vwap: vwap(c), adx: dx.adx[n]!, plusDi: dx.plusDi[n]!, minusDi: dx.minusDi[n]!,
+    ema50: ema(closes, 50)[n]!, ema200: ema(closes, 200)[n]!, close: closes[n]!,
+  };
+}
+
+export const ADX_TREND = 20;
 
 /** Long on bullish cross/trend with positive MACD momentum; Short on bearish cross/trend with negative momentum. */
 export function twoWaySignal(
@@ -209,6 +313,12 @@ export function twoWaySignal(
   p: StrategyParams,
   fast: boolean,
 ): { side: Side | null; reason: string } {
+  // Low ADX = ranging market: fade the Bollinger band edges with Stochastic confirmation.
+  if (Number.isFinite(x.adx) && x.adx < ADX_TREND && Number.isFinite(x.bbLower)) {
+    if (x.close <= x.bbLower && x.stochK < 20) return { side: "long", reason: "نطاق (ADX منخفض): لمس Bollinger السفلي + Stochastic متشبع بيعياً" };
+    if (x.close >= x.bbUpper && x.stochK > 80) return { side: "short", reason: "نطاق (ADX منخفض): لمس Bollinger العلوي + Stochastic متشبع شرائياً" };
+    return { side: null, reason: `سوق عرضي (ADX ${x.adx.toFixed(0)}) — ينتظر لمس حواف Bollinger مع Stochastic` };
+  }
   const up = ind.emaFast > ind.emaSlow;
   const crossUp = ind.prevEmaFast <= ind.prevEmaSlow && up;
   const crossDown = ind.prevEmaFast >= ind.prevEmaSlow && !up;

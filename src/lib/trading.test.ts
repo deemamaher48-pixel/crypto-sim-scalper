@@ -99,3 +99,29 @@ describe("long & short", () => {
     expect(atr(c, 14)[19]).toBeCloseTo(4);
   });
 });
+
+import { adx, bollinger, stochastic, vwap, twoWaySignal } from "./trading";
+describe("extra indicators", () => {
+  it("stochastic is 100 at the top of the range", () => {
+    const c = Array.from({ length: 20 }, (_, i) => ({ high: 100 + i, low: 90 + i, close: 100 + i }));
+    expect(stochastic(c, 14).k[19]).toBe(100);
+  });
+  it("bollinger bands collapse on flat prices", () => {
+    const b = bollinger(Array(25).fill(50), 20, 2);
+    expect(b.upper[24]).toBe(50);
+    expect(b.lower[24]).toBe(50);
+  });
+  it("vwap weights price by volume", () => {
+    expect(vwap([{ high: 10, low: 10, close: 10, volume: 1, time: 0 }, { high: 20, low: 20, close: 20, volume: 3, time: 60 }])).toBe(17.5);
+  });
+  it("adx is high in a strong steady trend", () => {
+    const c = Array.from({ length: 60 }, (_, i) => ({ high: 101 + i, low: 99 + i, close: 100.5 + i }));
+    expect(adx(c).adx[59]).toBeGreaterThan(40);
+  });
+  it("in a ranging market (ADX < 20) shorts the upper band when Stochastic > 80", () => {
+    const p = { emaFast: 9, emaSlow: 21, rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30 };
+    const ind = { emaFast: 101, emaSlow: 100, rsi: 60, prevEmaFast: 101, prevEmaSlow: 100, prevRsi: 60 };
+    const x = { macd: 0, macdSignal: 0, hist: 1, atr: 1, stochK: 85, stochD: 80, bbUpper: 105, bbMid: 100, bbLower: 95, bbWidthPct: 10, vwap: 100, adx: 15, plusDi: 20, minusDi: 20, ema50: 100, ema200: 100, close: 105 };
+    expect(twoWaySignal(ind, x, p, false).side).toBe("short");
+  });
+});
