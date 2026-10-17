@@ -11,13 +11,19 @@ import { ema } from "@/lib/trading";
 import type { Kline } from "@/lib/binance";
 
 function cssColor(name: string) {
-  // Resolve a theme token into a concrete rgb() string the canvas can use.
+  // Resolve a theme token (oklch) into rgba() via canvas — the chart library can't parse oklch.
   const el = document.createElement("div");
   el.style.color = `var(${name})`;
   document.body.appendChild(el);
   const c = getComputedStyle(el).color;
   el.remove();
-  return c;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 1;
+  const ctx = cv.getContext("2d")!;
+  ctx.fillStyle = c;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, bl, a] = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgba(${r}, ${g}, ${bl}, ${((a ?? 255) / 255).toFixed(2)})`;
 }
 
 export default function PriceChart({
