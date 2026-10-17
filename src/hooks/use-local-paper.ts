@@ -6,6 +6,7 @@ import { computeExtras, computeIndicators, riskGate, sidePnl, type Side, type St
 import {
   SMART, breakevenStop, inCooldown, inRolloverWindow, smartBracket, smartCandleExit, smartSignal, type SmartSignal,
 } from "@/lib/smart-scalp";
+import { SNIPER, breakerTripped, fastBreakeven, sniperBracket, sniperCandleExit, sniperCooldown, sniperSignal } from "@/lib/sniper-scalp";
 
 // Guest futures-style paper engine running Smart VWAP & Momentum Scalping (5m + 15m) on live prices; state in localStorage.
 export type LocalSettings = StrategyParams & {
@@ -39,8 +40,11 @@ export type LocalTrade = {
   exitReason?: LocalExit;
   openedAt: string;
   closedAt?: string;
+  mode?: "sniper";
+  atr?: number;
+  beDone?: boolean;
 };
-type State = { settings: LocalSettings; usdt: number; btc: number; enabled: boolean; trades: LocalTrade[] };
+type State = { settings: LocalSettings; usdt: number; btc: number; enabled: boolean; trades: LocalTrade[]; sniper?: boolean; sniperPausedUntil?: number; sniperResetAt?: number };
 
 export const START_BALANCE = 10000;
 const KEY = "scalper-paper-v1";
@@ -58,11 +62,15 @@ const DEFAULT: State = {
 
 export type BotStatus = { tone: "off" | "watch" | "blocked" | "open" | "ready"; text: string };
 
-export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
+export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, klines1: Kline[] = []) {
   const rollover = (ms: number) => gold && inRolloverWindow(ms);
   const [st, setSt] = useState<State>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
   const lastCandle = useRef(0);
+  const sniper = !!st.sniper;
+  // Sniper mode: 1m executes, 5m filters. Default: 5m executes, 15m filters.
+  const klines = sniper ? klines1 : klines5;
+  const filterK = sniper ? klines5 : klines15;
 
   useEffect(() => {
     try {
@@ -86,15 +94,19 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
   const price = klines.at(-1)?.close ?? 0;
   const closedCount = klines.length - 1;
   const closedBars = useMemo(() => klines.slice(0, -1), [closedCount, klines.at(-2)?.close]);
-  const closed15 = useMemo(() => klines15.slice(0, -1), [klines15.length, klines15.at(-2)?.close]);
+  const closed15 = useMemo(() => filterK.slice(0, -1), [filterK.length, filterK.at(-2)?.close, sniper]);
   const ind = useMemo(() => computeIndicators(closedBars.map((k) => k.close), st.settings), [closedBars, st.settings]);
   const extras = useMemo(() => computeExtras(closedBars), [closedBars]);
-  const signal: SmartSignal | null = useMemo(() => smartSignal(closedBars, closed15), [closedBars, closed15]);
+  const signal: SmartSignal | null = useMemo(() => (sniper ? sniperSignal : smartSignal)(closedBars, closed15), [closedBars, closed15, sniper]);
   const open = st.trades.find((t) => !t.closedAt);
   const rem = (t: LocalTrade) => t.remainingQty ?? t.qty;
   const unrealized = open && price ? (open.realized ?? 0) + sidePnl(open.side, rem(open), open.entry, price) : 0;
-  const lastStop = st.trades.find((t) => t.closedAt && (t.pnl ?? 0) < 0);
-  const lastStopAt = lastStop?.closedAt ? Date.parse(lastStop.closedAt) : null;
+  const lastStop = st.trades.find((t) => t.closedAt && (t.pnl ?? 0) < 0 && !!t.mode === sniper);
+  let lastStopAt = lastStop?.closedAt ? Date.parse(lastStop.closedAt) : null;
+  // Manually toggling the sniper back on clears its cooldown.
+  if (sniper && lastStopAt != null && st.sniperResetAt && lastStopAt < st.sniperResetAt) lastStopAt = null;
+  const cooling = (now: number) => (sniper ? sniperCooldown(lastStopAt, now) : inCooldown(lastStopAt, now));
+  const breakerOn = sniper && (st.sniperPausedUntil ?? 0) > Date.now();
 
   function close(reason: LocalExit, at = price) {
     setSt((s) => {
@@ -104,8 +116,17 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
       const part = sidePnl(t.side, q, t.entry, at);
       const pnl = (t.realized ?? 0) + part;
       toast[pnl > 0 ? "success" : pnl < 0 ? "error" : "message"](tradeOutcome(pnl));
+      let paused = s.sniperPausedUntil;
+      if (t.mode === "sniper") {
+        const recent = [pnl, ...s.trades.filter((x) => x.mode === "sniper" && x.closedAt && x.id !== t.id && Date.parse(x.closedAt) >= (s.sniperResetAt ?? 0)).map((x) => x.pnl ?? 0)];
+        if (breakerTripped(recent)) {
+          paused = Date.now() + SNIPER.breakerMs;
+          toast.error("قاطع الأمان: خسارتان متتاليتان على الدقيقة — إيقاف القنص 30 دقيقة (السوق متذبذب)", { duration: 15000 });
+        }
+      }
       return {
         ...s,
+        sniperPausedUntil: paused,
         usdt: s.usdt + t.size * (q / t.qty) + part,
         trades: s.trades.map((x) =>
           x.id === t.id ? { ...x, exit: at, pnl, remainingQty: 0, exitReason: reason, closedAt: new Date().toISOString() } : x,
@@ -119,12 +140,13 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
     setSt((s) => {
       const t = s.trades.find((x) => !x.closedAt);
       if (!t || t.tp1Hit) return s;
-      const q = t.qty * SMART.tp1Close;
+      const frac = t.mode === "sniper" ? SNIPER.tp1Close : SMART.tp1Close;
+      const q = t.qty * frac;
       const part = sidePnl(t.side, q, t.entry, at);
-      toast.success(`الهدف الأول تحقق — إغلاق 60% بربح ${part.toFixed(2)}$ ونقل الوقف للدخول`);
+      toast.success(`الهدف الأول تحقق — إغلاق ${frac * 100}% بربح ${part.toFixed(2)}$ ونقل الوقف للدخول`);
       return {
         ...s,
-        usdt: s.usdt + t.size * SMART.tp1Close + part,
+        usdt: s.usdt + t.size * frac + part,
         trades: s.trades.map((x) =>
           x.id === t.id
             ? { ...x, tp1Hit: true, realized: part, remainingQty: t.qty - q, stop: breakevenStop(t.side, t.entry) }
@@ -156,7 +178,7 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
       return;
     }
     const s = st.settings;
-    const br = smartBracket(side, price, a);
+    const br = sniper ? sniperBracket(side, price, a, gold) : smartBracket(side, price, a, gold);
     toast.success(`${side === "long" ? "شراء Long" : "بيع Short"} عند ${price.toFixed(2)} — ${reason}`);
     setSt((x) => ({
       ...x,
@@ -165,6 +187,7 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
         id: crypto.randomUUID(), side, size: s.positionUsdt, qty: s.positionUsdt / price, remainingQty: s.positionUsdt / price,
         realized: 0, tp1: br.tp1, tp1Hit: false, best: price, entry: price,
         stop: br.stop, target: br.target, entryReason: reason, openedAt: new Date().toISOString(),
+        ...(sniper ? { mode: "sniper" as const, atr: a } : {}),
       }),
     }));
   }
@@ -172,12 +195,13 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
   let status: BotStatus;
   if (open) status = { tone: "open", text: `صفقة ${open.side === "long" ? "Long" : "Short"} مفتوحة${open.tp1Hit ? " — الهدف الأول تحقق، الوقف على الدخول" : " — يراقب الوقف والأهداف"}` };
   else if (!st.enabled) status = { tone: "off", text: "البوت متوقف — شغّله ليبدأ مراقبة السوق" };
-  else if (!signal) status = { tone: "watch", text: "يجمع بيانات شموع 5m و15m…" };
+  else if (breakerOn) status = { tone: "blocked", text: `قاطع الأمان — القنص متوقف حتى ${new Date(st.sniperPausedUntil!).toLocaleTimeString("ar")}` };
+  else if (!signal) status = { tone: "watch", text: sniper ? "يجمع بيانات شموع 1m و5m…" : "يجمع بيانات شموع 5m و15m…" };
   else {
     const g = gate();
     if (!g.ok) status = { tone: "blocked", text: `متوقف عن الدخول — ${g.reason}` };
-    else if (inRolloverWindow(Date.now())) status = { tone: "blocked", text: "إيقاف وقت إغلاق/افتتاح الذهب (23:00–01:00 UTC)" };
-    else if (inCooldown(lastStopAt, Date.now())) status = { tone: "blocked", text: "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
+    else if (rollover(Date.now())) status = { tone: "blocked", text: "إيقاف وقت إغلاق/افتتاح الذهب (23:00–01:00 UTC)" };
+    else if (cooling(Date.now())) status = { tone: "blocked", text: sniper ? "تبريد بعد وقف الخسارة (5 دقائق)" : "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
     else if (signal.side) status = { tone: "ready", text: signal.reason };
     else status = { tone: "watch", text: signal.reason };
   }
@@ -189,6 +213,13 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
     if (d * (price - open.stop) <= 0) return close("stop_loss", price);
     if (d * (price - open.target) >= 0) return close("take_profit", price);
     if (!open.tp1Hit && open.tp1 != null && d * (price - open.tp1) >= 0) return takeTp1(price);
+    if (open.mode === "sniper" && !open.beDone && open.atr) {
+      const be = fastBreakeven(open.side, open.entry, price, open.atr);
+      if (be != null) {
+        toast.success("التأمين الخاطف — نقل الوقف إلى الدخول + العمولة");
+        return setSt((s) => ({ ...s, trades: s.trades.map((x) => (x.id === open.id ? { ...x, beDone: true, stop: be, best: price } : x)) }));
+      }
+    }
     if (open.best == null || d * (price - open.best) > 0)
       setSt((s) => ({ ...s, trades: s.trades.map((x) => (x.id === open.id ? { ...x, best: price } : x)) }));
   }, [price, open?.id, open?.tp1Hit, loaded]);
@@ -200,16 +231,16 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
     if (candleTime === lastCandle.current) return;
     lastCandle.current = candleTime;
     if (open) {
-      const r = smartCandleExit(
-        { side: open.side, entry: open.entry, tp1: open.tp1 ?? open.target, tp1Hit: !!open.tp1Hit, best: open.best ?? open.entry, openedAt: open.openedAt },
-        closedBars, Date.now(),
-      );
+      const tt = { side: open.side, entry: open.entry, tp1: open.tp1 ?? open.target, tp1Hit: !!open.tp1Hit, best: open.best ?? open.entry, openedAt: open.openedAt };
+      // Exits follow the frame of the trade's own strategy; skip if the active frame differs.
+      if (!!open.mode !== sniper) return;
+      const r = sniper ? sniperCandleExit(tt, closedBars, Date.now()) : smartCandleExit(tt, closedBars, Date.now());
       if (r) close(r);
       return;
     }
-    if (!st.enabled || !signal?.side || !gate().ok || inRolloverWindow(Date.now()) || inCooldown(lastStopAt, Date.now())) return;
+    if (!st.enabled || breakerOn || !signal?.side || !gate().ok || rollover(Date.now()) || cooling(Date.now())) return;
     openTrade(signal.side, signal.reason);
-  }, [closedCount, signal, loaded, st.enabled]);
+  }, [closedCount, signal, loaded, st.enabled, sniper]);
 
   return {
     ...st,
@@ -223,6 +254,13 @@ export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
     equity: st.usdt + (open ? open.size * (rem(open) / open.qty) + sidePnl(open.side, rem(open), open.entry, price || open.entry) : 0),
     status,
     setEnabled: (enabled: boolean) => setSt((s) => ({ ...s, enabled })),
+    sniper,
+    breakerOn,
+    setSniper: (on: boolean) => {
+      lastCandle.current = 0;
+      // Turning it back on manually clears cooldown and circuit breaker.
+      setSt((s) => ({ ...s, sniper: on, ...(on ? { sniperResetAt: Date.now(), sniperPausedUntil: 0 } : {}) }));
+    },
     updateSettings: (p: Partial<LocalSettings>) => setSt((s) => ({ ...s, settings: { ...s.settings, ...p } })),
     longNow: () => openTrade("long", "Long تجريبي يدوي"),
     shortNow: () => openTrade("short", "Short تجريبي يدوي"),
