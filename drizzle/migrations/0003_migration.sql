@@ -1,0 +1,1 @@
+alter table public.trades add column if not exists side text not null default 'long' check (side in ('long','short'));

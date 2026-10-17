@@ -113,6 +113,7 @@ export type Database = {
           opened_at: string
           pnl: number | null
           qty: number
+          side: string
           status: string
           stop_price: number
           symbol: string
@@ -130,6 +131,7 @@ export type Database = {
           opened_at?: string
           pnl?: number | null
           qty: number
+          side?: string
           status?: string
           stop_price: number
           symbol: string
@@ -147,6 +149,7 @@ export type Database = {
           opened_at?: string
           pnl?: number | null
           qty?: number
+          side?: string
           status?: string
           stop_price?: number
           symbol?: string
