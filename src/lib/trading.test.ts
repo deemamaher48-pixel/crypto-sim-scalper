@@ -71,3 +71,31 @@ describe("fast scalping mode", () => {
     expect(fastEntrySignal({ ...uptrend, rsi: 75 }, p).buy).toBe(false);
   });
 });
+
+import { atr, macd, sideBracket, sideExit, sidePnl } from "./trading";
+describe("long & short", () => {
+  it("short profits when price falls, net of 0.1% fees per side", () => {
+    expect(sidePnl("short", 1, 100, 90)).toBeCloseTo(10 - 0.19);
+    expect(sidePnl("long", 1, 100, 90)).toBeCloseTo(-10 - 0.19);
+  });
+  it("short stop is above entry and target below, sized by ATR", () => {
+    const b = sideBracket("short", 100, { atr: 2, slMult: 1.5, tpMult: 2.5, slPct: 0.5, tpPct: 1 });
+    expect(b.stop).toBe(103);
+    expect(b.target).toBe(95);
+  });
+  it("falls back to fixed percentages without ATR", () => {
+    const b = sideBracket("long", 100, { atr: null, slMult: 1.5, tpMult: 2.5, slPct: 0.5, tpPct: 1 });
+    expect(b.stop).toBeCloseTo(99.5);
+    expect(b.target).toBeCloseTo(101);
+  });
+  it("short hits stop loss when price rises to stop", () => {
+    expect(sideExit(103, { side: "short", stop: 103, target: 95 }, null)).toBe("stop_loss");
+    expect(sideExit(95, { side: "short", stop: 103, target: 95 }, null)).toBe("take_profit");
+  });
+  it("computes MACD and ATR", () => {
+    const up = Array.from({ length: 60 }, (_, i) => 100 + i);
+    expect(macd(up).line[59]).toBeGreaterThan(0);
+    const c = Array.from({ length: 20 }, () => ({ high: 102, low: 98, close: 100 }));
+    expect(atr(c, 14)[19]).toBeCloseTo(4);
+  });
+});

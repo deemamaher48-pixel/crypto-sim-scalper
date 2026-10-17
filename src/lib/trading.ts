@@ -159,3 +159,97 @@ export function fastEntrySignal(ind: Indicators, p: StrategyParams): { buy: bool
   if (ind.rsi <= p.rsiOversold + 5) return { buy: true, reason: "سكالبينغ سريع: RSI منخفض جداً" };
   return { buy: false, reason: `يراقب السوق — في انتظار صعود EMA ${p.emaFast} فوق EMA ${p.emaSlow}` };
 }
+
+// ---------- Two-way (futures-style) paper trading ----------
+export type Side = "long" | "short";
+export type Candle = { high: number; low: number; close: number };
+
+export function macd(values: number[], fast = 12, slow = 26, signal = 9) {
+  const f = ema(values, fast);
+  const s = ema(values, slow);
+  const line = values.map((_, i) => f[i]! - s[i]!);
+  const start = line.findIndex((v) => Number.isFinite(v));
+  const sig: number[] = new Array(values.length).fill(NaN);
+  if (start >= 0) {
+    const e = ema(line.slice(start), signal);
+    e.forEach((v, i) => (sig[start + i] = v));
+  }
+  return { line, signal: sig, hist: line.map((v, i) => v - sig[i]!) };
+}
+
+/** Wilder ATR. */
+export function atr(c: Candle[], period = 14): number[] {
+  const out: number[] = new Array(c.length).fill(NaN);
+  if (c.length <= period) return out;
+  const tr = c.map((k, i) =>
+    i === 0 ? k.high - k.low : Math.max(k.high - k.low, Math.abs(k.high - c[i - 1]!.close), Math.abs(k.low - c[i - 1]!.close)),
+  );
+  let a = tr.slice(1, period + 1).reduce((x, y) => x + y, 0) / period;
+  out[period] = a;
+  for (let i = period + 1; i < c.length; i++) {
+    a = (a * (period - 1) + tr[i]!) / period;
+    out[i] = a;
+  }
+  return out;
+}
+
+export type Extras = { macd: number; macdSignal: number; hist: number; atr: number };
+export function computeExtras(c: Candle[], atrPeriod = 14): Extras | null {
+  const m = macd(c.map((k) => k.close));
+  const a = atr(c, atrPeriod);
+  const n = c.length - 1;
+  const v = { macd: m.line[n]!, macdSignal: m.signal[n]!, hist: m.hist[n]!, atr: a[n]! };
+  return n > 0 && Object.values(v).every(Number.isFinite) ? v : null;
+}
+
+/** Long on bullish cross/trend with positive MACD momentum; Short on bearish cross/trend with negative momentum. */
+export function twoWaySignal(
+  ind: Indicators,
+  x: Extras,
+  p: StrategyParams,
+  fast: boolean,
+): { side: Side | null; reason: string } {
+  const up = ind.emaFast > ind.emaSlow;
+  const crossUp = ind.prevEmaFast <= ind.prevEmaSlow && up;
+  const crossDown = ind.prevEmaFast >= ind.prevEmaSlow && !up;
+  if ((fast ? up : crossUp) && x.hist > 0 && ind.rsi < p.rsiOverbought)
+    return { side: "long", reason: `${fast ? "سريع: " : ""}EMA صاعد + MACD إيجابي` };
+  if ((fast ? !up : crossDown) && x.hist < 0 && ind.rsi > p.rsiOversold)
+    return { side: "short", reason: `${fast ? "سريع: " : ""}EMA هابط + MACD سلبي` };
+  if (up && x.hist <= 0) return { side: null, reason: "يراقب — الاتجاه صاعد لكن MACD لم يؤكد الزخم" };
+  if (!up && x.hist >= 0) return { side: null, reason: "يراقب — الاتجاه هابط لكن MACD لم يؤكد الزخم" };
+  if (ind.rsi >= p.rsiOverbought) return { side: null, reason: "يراقب — RSI متشبع شرائياً، لا Long" };
+  if (ind.rsi <= p.rsiOversold) return { side: null, reason: "يراقب — RSI متشبع بيعياً، لا Short" };
+  return { side: null, reason: "يراقب السوق — في انتظار تقاطع EMA جديد مؤكد بـ MACD" };
+}
+
+/** Stop/target for either side: ATR multiples when atr is given, else fixed percentages. */
+export function sideBracket(
+  side: Side,
+  entry: number,
+  o: { atr?: number | null; slMult: number; tpMult: number; slPct: number; tpPct: number },
+) {
+  const slDist = o.atr ? o.atr * o.slMult : (entry * o.slPct) / 100;
+  const tpDist = o.atr ? o.atr * o.tpMult : (entry * o.tpPct) / 100;
+  return side === "long"
+    ? { stop: entry - slDist, target: entry + tpDist }
+    : { stop: entry + slDist, target: entry - tpDist };
+}
+
+export function sideExit(
+  price: number,
+  t: { side: Side; stop: number; target: number },
+  ind: Indicators | null,
+): ExitReason | null {
+  if (t.side === "long") return exitCheck(price, { stop_price: t.stop, target_price: t.target }, ind);
+  if (price >= t.stop) return "stop_loss";
+  if (price <= t.target) return "take_profit";
+  if (ind && ind.prevEmaFast <= ind.prevEmaSlow && ind.emaFast > ind.emaSlow) return "ema_cross";
+  return null;
+}
+
+/** Futures-style PnL net of 0.1% fee on entry and exit notional. */
+export function sidePnl(side: Side, qty: number, entry: number, exit: number) {
+  const dir = side === "long" ? 1 : -1;
+  return dir * (exit - entry) * qty - PAPER_FEE * (entry + exit) * qty;
+}
