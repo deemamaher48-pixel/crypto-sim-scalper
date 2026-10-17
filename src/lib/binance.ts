@@ -1,11 +1,20 @@
 // Binance Spot Testnet REST helpers (server-side use; signing via Web Crypto, workerd-safe).
 export const TESTNET_REST = "https://testnet.binance.vision";
 export const TESTNET_WS = "wss://stream.testnet.binance.vision/ws";
+// Real live market data (public, no keys).
+export const LIVE_REST = "https://data-api.binance.vision";
+export const LIVE_WS = "wss://data-stream.binance.vision/ws";
 
 export type Kline = { time: number; open: number; high: number; low: number; close: number; volume: number };
 
-export async function fetchKlines(symbol: string, interval: string, limit = 200): Promise<Kline[]> {
-  const res = await fetch(`${TESTNET_REST}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+export async function fetchKlines(
+  symbol: string,
+  interval: string,
+  limit = 200,
+  source: "live" | "testnet" = "live",
+): Promise<Kline[]> {
+  const base = source === "live" ? LIVE_REST : TESTNET_REST;
+  const res = await fetch(`${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
   if (!res.ok) throw new Error(`تعذر جلب الشموع (${res.status})`);
   const rows = (await res.json()) as unknown[][];
   return rows.map((r) => ({
