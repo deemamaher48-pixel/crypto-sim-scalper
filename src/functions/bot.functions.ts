@@ -262,7 +262,7 @@ export async function tickUser(userId: string) {
       qty = execQty - fee;
     }
     const b = paper
-      ? sideBracket(side, price, { atr: extras?.atr, slMult: 1.5, tpMult: 2.5, slPct: Number(settings.stop_loss_pct), tpPct: Number(settings.take_profit_pct) })
+      ? sideBracket(side, price, { atr: extras?.atr ?? null, slMult: 1.5, tpMult: 2.5, slPct: Number(settings.stop_loss_pct), tpPct: Number(settings.take_profit_pct) })
       : bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
     const { error: insErr } = await db.from("trades").insert({
       user_id: userId,
