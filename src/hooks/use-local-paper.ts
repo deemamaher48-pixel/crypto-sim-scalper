@@ -1,3 +1,5 @@
+import { newsFreeze } from "@/lib/news-guard";
+import { getNewsTimes } from "@/functions/news.functions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { prependTrade, tradeOutcome } from "@/lib/trade-history";
@@ -64,7 +66,9 @@ const DEFAULT: State = {
 export type BotStatus = { tone: "off" | "watch" | "blocked" | "open" | "ready"; text: string };
 
 export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, klines1: Kline[] = [], active = true) {
-  const rollover = (ms: number) => gold && inRolloverWindow(ms);
+  const [newsTimes, setNewsTimes] = useState<number[]>([]);
+  useEffect(() => { const load = () => getNewsTimes().then(setNewsTimes).catch(() => {}); load(); const id = setInterval(load, 30 * 60_000); return () => clearInterval(id); }, []);
+  const rollover = (ms: number) => (gold && inRolloverWindow(ms)) || newsFreeze(newsTimes, ms) != null;
   const [st, setSt] = useState<State>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
   const lastCandle = useRef(0);
@@ -201,7 +205,7 @@ export function useLocalPaper(klines5: Kline[], klines15: Kline[], gold = true, 
   else {
     const g = gate();
     if (!g.ok) status = { tone: "blocked", text: `متوقف عن الدخول — ${g.reason}` };
-    else if (rollover(Date.now())) status = { tone: "blocked", text: "إيقاف وقت إغلاق/افتتاح الذهب (23:00–01:00 UTC)" };
+    else if (rollover(Date.now())) status = { tone: "blocked", text: newsFreeze(newsTimes, Date.now()) != null ? "تجميد مؤقت 10 دقائق — خبر اقتصادي قوي" : "إيقاف وقت إغلاق/افتتاح الذهب (23:00–01:00 UTC)" };
     else if (cooling(Date.now())) status = { tone: "blocked", text: sniper ? "تبريد بعد وقف الخسارة (5 دقائق)" : "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
     else if (signal.side) status = { tone: "ready", text: signal.reason };
     else status = { tone: "watch", text: signal.reason };
