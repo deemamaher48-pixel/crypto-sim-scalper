@@ -233,6 +233,7 @@ const toneCls = {
 } as const;
 
 function IndicatorsPanel({ x }: { x: ReturnType<typeof useLocalPaper>["extras"] }) {
+  const [open, setOpen] = useState(false);
   if (!x) return null;
   const trending = x.adx >= 20;
   const items: { group: string; label: string; value: string; note: string; cls?: string }[] = [
@@ -254,21 +255,31 @@ function IndicatorsPanel({ x }: { x: ReturnType<typeof useLocalPaper>["extras"] 
   ];
   return (
     <div className="rounded-lg border bg-card p-4">
-      <div className="mb-3 flex items-center justify-between text-sm">
-        <span className="font-medium">لوحة المؤشرات</span>
-        <span className={`rounded px-2 py-0.5 text-xs ${trending ? "bg-primary/15 text-primary" : "bg-chart-2/15 text-chart-2"}`}>
-          الاستراتيجية الحالية: {trending ? "تتبع الاتجاه" : "تداول النطاق"}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="mb-1 flex w-full items-center justify-between text-sm"
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-1.5 font-medium">
+          <span className={`transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
+          لوحة المؤشرات
         </span>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {items.map((i) => (
-          <div key={i.label} className="rounded-md bg-muted/50 p-3">
-            <div className="text-[11px] text-muted-foreground">{i.group} · {i.label}</div>
-            <div className={`num mt-1 font-semibold ${i.cls ?? ""}`}>{i.value}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{i.note}</div>
-          </div>
-        ))}
-      </div>
+        <span className={`rounded px-2 py-0.5 text-xs ${trending ? "bg-primary/15 text-primary" : "bg-chart-2/15 text-chart-2"}`}>
+          {trending ? "تتبع الاتجاه" : "تداول النطاق"}
+        </span>
+      </button>
+      {open && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {items.map((i) => (
+            <div key={i.label} className="rounded-md bg-muted/50 p-3">
+              <div className="text-[11px] text-muted-foreground">{i.group} · {i.label}</div>
+              <div className={`num mt-1 font-semibold ${i.cls ?? ""}`}>{i.value}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{i.note}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
