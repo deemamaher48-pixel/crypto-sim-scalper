@@ -46,6 +46,9 @@ export type Database = {
           interval: string
           max_daily_loss_usdt: number
           max_trades_per_day: number
+          mode: string
+          paper_btc: number
+          paper_usdt: number
           position_usdt: number
           rsi_overbought: number
           rsi_oversold: number
@@ -63,6 +66,9 @@ export type Database = {
           interval?: string
           max_daily_loss_usdt?: number
           max_trades_per_day?: number
+          mode?: string
+          paper_btc?: number
+          paper_usdt?: number
           position_usdt?: number
           rsi_overbought?: number
           rsi_oversold?: number
@@ -80,6 +86,9 @@ export type Database = {
           interval?: string
           max_daily_loss_usdt?: number
           max_trades_per_day?: number
+          mode?: string
+          paper_btc?: number
+          paper_usdt?: number
           position_usdt?: number
           rsi_overbought?: number
           rsi_oversold?: number
@@ -100,6 +109,7 @@ export type Database = {
           exit_price: number | null
           exit_reason: string | null
           id: string
+          mode: string
           opened_at: string
           pnl: number | null
           qty: number
@@ -116,6 +126,7 @@ export type Database = {
           exit_price?: number | null
           exit_reason?: string | null
           id?: string
+          mode?: string
           opened_at?: string
           pnl?: number | null
           qty: number
@@ -132,6 +143,7 @@ export type Database = {
           exit_price?: number | null
           exit_reason?: string | null
           id?: string
+          mode?: string
           opened_at?: string
           pnl?: number | null
           qty?: number
