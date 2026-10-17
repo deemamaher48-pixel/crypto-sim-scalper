@@ -7,3 +7,4 @@
 - [x] Server background bot via scheduled job (runs with page closed) for signed-in accounts
 - [x] Home: precise bot status badge, instant test buy button, fast scalping mode
 - [ ] Home futures-style paper: Long & Short, MACD + ATR (dynamic SL/TP), instant Long/Short buttons, chart shows side
+- [ ] Add Stochastic, Bollinger Bands, VWAP, ADX, EMA 50/200 to indicators panel; ADX picks trend vs range
