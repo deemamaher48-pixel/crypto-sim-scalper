@@ -52,10 +52,10 @@ describe("trading rules", () => {
 
 import { paperBuy, paperSell } from "./trading";
 describe("paper trading", () => {
-  it("charges 0.1% per side so a flat round trip loses about 0.2%", () => {
+  it("charges only the MT5-style spread so a flat round trip loses about 0.01%", () => {
     const b = paperBuy(100, 50000);
     const s = paperSell(b.qty, b.entry, 50000);
-    expect(s.pnl).toBeCloseTo(-0.1999, 3);
+    expect(s.pnl).toBeCloseTo(-0.01, 3);
   });
 });
 
