@@ -3,12 +3,12 @@ import { adx, atr, ema, macd, rsi, sma, vwap, PAPER_FEE, type Side } from "@/lib
 import type { Bar, SmartSignal, SmartCheck } from "@/lib/smart-scalp";
 
 export const SNIPER = {
-  minScore: 85,
-  volMult: 1.8,
-  minBody: 0.7,
+  minScore: 75,
+  volMult: 1.3,
+  minBody: 0.55,
   maxRangeAtr: 2.2,
   maxVwapAtr: 2,
-  beAtr: 0.8,
+  beAtr: 1.0,
   slAtr: 1.5,
   slMinUsd: 0.8,
   slMaxUsd: 2.2,
@@ -16,9 +16,9 @@ export const SNIPER = {
   tp2Atr: 2.5,
   tp1Close: 0.7,
   timeStopBars: 3,
-  cooldownBars: 5,
+  cooldownBars: 2,
   barSec: 60,
-  breakerLosses: 2,
+  breakerLosses: 3,
   breakerMs: 30 * 60 * 1000,
 } as const;
 
@@ -64,7 +64,7 @@ export function sniperSignal(c1: Bar[], c5: Bar[]): SmartSignal | null {
   const tag = side === "long" ? "Long" : "Short";
   if (!checks[0]![side]) return { ...base, side: null, reason: `قنص الدقيقة — الاتجاه غير متطابق على الفريمين (${best}%)` };
   if (!checks[1]![side]) return { ...base, side: null, reason: `قنص الدقيقة — لا انفجار سيولة أو شمعة غير صافية (${best}%)` };
-  if (best < SNIPER.minScore) return { ...base, side: null, reason: `قنص الدقيقة — نقاط ${tag} ${best}% أقل من 85%` };
+  if (best < SNIPER.minScore) return { ...base, side: null, reason: `قنص الدقيقة — نقاط ${tag} ${best}% أقل من 75%` };
   if (Math.abs(bar.close - v1) > SNIPER.maxVwapAtr * a)
     return { ...base, side: null, reason: "منع المطاردة — السعر بعيد عن VWAP أكثر من 2×ATR" };
   return { ...base, side, reason: `قنص الدقيقة ${tag} — نقاط ${best}%` };
