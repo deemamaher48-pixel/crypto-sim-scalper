@@ -50,6 +50,7 @@ export default function PriceChart({
     const grid = cssColor("--border");
     const c = createChart(ref.current, {
       autoSize: true,
+      localization: { locale: "en-US" },
       layout: { background: { color: "transparent" }, textColor: fg, fontFamily: "JetBrains Mono" },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
       timeScale: { timeVisible: true, secondsVisible: false, borderColor: grid },
