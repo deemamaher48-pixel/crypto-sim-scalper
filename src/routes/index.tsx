@@ -3,7 +3,7 @@ import { lazy, Suspense, useState } from "react";
 import { Power, RotateCcw, X, Zap, TrendingUp, TrendingDown } from "lucide-react";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { START_BALANCE, useLocalPaper, type LocalSettings } from "@/hooks/use-local-paper";
-import { exitReasonLabel } from "@/lib/trading";
+import { tradeOutcome } from "@/lib/trade-history";
 import { fmt } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +62,7 @@ function Home() {
       </header>
 
       <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[1fr_340px]">
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-end gap-6 rounded-lg border bg-card p-4">
             <div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -97,25 +97,25 @@ function Home() {
             <div className="flex items-center justify-between border-b px-4 py-2 text-sm">
               <span className="font-medium">سجل الصفقات</span>
               <span className="text-xs text-muted-foreground">
-                {closed.length} صفقة · نجاح {closed.length ? fmt((wins / closed.length) * 100, 0) : 0}%
+                {bot.trades.length} صفقة · نجاح {closed.length ? fmt((wins / closed.length) * 100, 0) : 0}%
               </span>
             </div>
             <div className="max-h-72 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b">
-                    {["الوقت", "الاتجاه", "الدخول", "الخروج", "صافي الربح", "السبب"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
+                    {["الوقت", "الاتجاه", "الدخول", "الخروج", "صافي الربح", "النتيجة"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {bot.trades.map((t) => (
                     <tr key={t.id} className="border-b last:border-0">
-                      <td className="num px-3 py-2 text-xs">{new Date(t.openedAt).toLocaleTimeString("en-GB")}</td>
+                      <td className="num whitespace-nowrap px-3 py-2 text-xs">{new Date(t.openedAt).toLocaleString("en-GB")}</td>
                       <td className="px-3 py-2"><SideTag side={t.side} /></td>
                       <td className="num px-3 py-2">{fmt(t.entry)}</td>
                       <td className="num px-3 py-2">{fmt(t.exit)}</td>
                       <td className={`num px-3 py-2 font-semibold ${t.pnl == null || t.pnl === 0 ? "text-muted-foreground" : t.pnl > 0 ? "text-bull" : "text-bear"}`}>{t.closedAt ? `${(t.pnl ?? 0) > 0 ? "+" : ""}${fmt(t.pnl)}` : "مفتوحة"}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{t.exitReason === "take_profit" && (t.pnl ?? 0) < 0 ? "بلوغ الهدف — خسارة بعد الرسوم" : t.exitReason ? exitReasonLabel[t.exitReason] : t.entryReason}</td>
+                      <td className={`whitespace-nowrap px-3 py-2 text-xs ${t.pnl == null || t.pnl === 0 ? "text-muted-foreground" : t.pnl > 0 ? "text-bull" : "text-bear"}`}>{t.closedAt ? tradeOutcome(t.pnl ?? 0) : "مفتوحة"}</td>
                     </tr>
                   ))}
                   {bot.trades.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">شغّل البوت لتبدأ الصفقات.</td></tr>}
@@ -125,7 +125,7 @@ function Home() {
           </div>
         </section>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold">

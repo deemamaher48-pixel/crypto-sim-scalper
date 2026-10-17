@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { prependTrade, tradeOutcome } from "@/lib/trade-history";
 import type { Kline } from "@/lib/binance";
 import {
   computeExtras,
@@ -97,7 +98,7 @@ export function useLocalPaper(klines: Kline[]) {
       const t = s.trades.find((x) => !x.closedAt);
       if (!t || !at) return s;
       const pnl = sidePnl(t.side, t.qty, t.entry, at);
-      toast[pnl >= 0 ? "success" : "error"](`إغلاق ${t.side === "long" ? "Long" : "Short"}: ${pnl.toFixed(2)} USDT`);
+      toast[pnl > 0 ? "success" : pnl < 0 ? "error" : "message"](tradeOutcome(pnl));
       return {
         ...s,
         usdt: s.usdt + t.size + pnl,
@@ -140,13 +141,12 @@ export function useLocalPaper(klines: Kline[]) {
     setSt((x) => ({
       ...x,
       usdt: x.usdt - s.positionUsdt,
-      trades: [
+      trades: prependTrade(x.trades,
         {
           id: crypto.randomUUID(), side, size: s.positionUsdt, qty: s.positionUsdt / price, entry: price,
           stop: br.stop, target: br.target, entryReason: reason, openedAt: new Date().toISOString(),
         },
-        ...x.trades,
-      ].slice(0, 500),
+      ),
     }));
   }
 

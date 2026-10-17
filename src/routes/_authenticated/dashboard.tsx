@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useLiveKlines } from "@/hooks/use-live-klines";
 import { computeIndicators, entrySignal } from "@/lib/trading";
 import { fmt, settingsQuery, tradesQuery } from "@/lib/queries";
+import { tradeOutcome } from "@/lib/trade-history";
 import { closeTradeNow, runBotTick } from "@/functions/bot.functions";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -83,11 +84,12 @@ function Dashboard() {
             .sort((a, b) => (b.closed_at ?? "").localeCompare(a.closed_at ?? ""))[0];
           if (latest?.pnl != null) pnl = Number(latest.pnl);
         }
-        setLog((l) => [{ at: new Date(), action: r.action, message: r.message, pnl }, ...l].slice(0, 30));
+        const message = pnl != null ? tradeOutcome(pnl) : r.message;
+        setLog((l) => [{ at: new Date(), action: r.action, message, pnl }, ...l].slice(0, 30));
         if (r.action === "buy" || r.action === "sell") {
-          if (pnl != null && pnl < 0) toast.error(r.message);
-          else if (pnl === 0 || (r.action === "sell" && pnl == null)) toast(r.message);
-          else toast.success(r.message);
+          if (pnl != null && pnl < 0) toast.error(message);
+          else if (pnl === 0 || (r.action === "sell" && pnl == null)) toast(message);
+          else toast.success(message);
           qc.invalidateQueries();
         }
       } catch (e) {
@@ -205,7 +207,7 @@ function Dashboard() {
                 onClick={async () => {
                   try {
                     const r = await close({ data: { tradeId: open.id } });
-                    const message = `أُغلقت الصفقة: ${r.pnl > 0 ? "+" : ""}${fmt(r.pnl)} USDT`;
+                    const message = tradeOutcome(r.pnl);
                     if (r.pnl < 0) toast.error(message);
                     else if (r.pnl > 0) toast.success(message);
                     else toast(message);
