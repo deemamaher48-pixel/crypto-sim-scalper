@@ -60,8 +60,8 @@ function TradesPage() {
         <Card label="عدد الصفقات" value={String(stats.count)} />
         <Card label="نسبة النجاح" value={`${fmt(stats.winRate, 1)}%`} />
         <Card label="معامل الربح" value={stats.pf == null ? "—" : fmt(stats.pf)} />
-        <Card label="أفضل صفقة" value={fmt(stats.best)} cls="text-bull" />
-        <Card label="أسوأ صفقة" value={fmt(stats.worst)} cls="text-bear" />
+        <Card label="أفضل صفقة" value={fmt(stats.best)} cls={stats.best > 0 ? "text-bull" : stats.best < 0 ? "text-bear" : "text-muted-foreground"} />
+        <Card label="أسوأ صفقة" value={fmt(stats.worst)} cls={stats.worst > 0 ? "text-bull" : stats.worst < 0 ? "text-bear" : "text-muted-foreground"} />
       </div>
 
       <div className="rounded-lg border bg-card p-4">
@@ -95,7 +95,7 @@ function TradesPage() {
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b">
-                {["الوقت", "الوضع", "الاتجاه", "الدخول", "الخروج", "الكمية", "الربح", "سبب الدخول", "سبب الخروج"].map((h) => (
+                {["الوقت", "الوضع", "الاتجاه", "الدخول", "الخروج", "الكمية", "صافي الربح", "سبب الدخول", "سبب الخروج"].map((h) => (
                   <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>
                 ))}
               </tr>
@@ -109,11 +109,11 @@ function TradesPage() {
                   <td className="num px-3 py-2">{fmt(t.entry_price)}</td>
                   <td className="num px-3 py-2">{fmt(t.exit_price)}</td>
                   <td className="num px-3 py-2">{fmt(t.qty, 5)}</td>
-                  <td className={`num px-3 py-2 font-medium ${t.pnl == null ? "" : Number(t.pnl) >= 0 ? "text-bull" : "text-bear"}`}>
-                    {t.status === "open" ? "مفتوحة" : fmt(t.pnl)}
+                  <td className={`num px-3 py-2 font-semibold ${t.pnl == null || Number(t.pnl) === 0 ? "text-muted-foreground" : Number(t.pnl) > 0 ? "text-bull" : "text-bear"}`}>
+                    {t.status === "open" ? "مفتوحة" : `${Number(t.pnl) > 0 ? "+" : ""}${fmt(t.pnl)}`}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{t.entry_reason}</td>
-                  <td className="px-3 py-2 text-xs">{t.exit_reason ? exitReasonLabel[t.exit_reason] ?? t.exit_reason : "—"}</td>
+                  <td className="px-3 py-2 text-xs">{t.exit_reason === "take_profit" && Number(t.pnl) < 0 ? "بلوغ الهدف — خسارة بعد الرسوم" : t.exit_reason ? exitReasonLabel[t.exit_reason] ?? t.exit_reason : "—"}</td>
                 </tr>
               ))}
               {rows.length === 0 && (

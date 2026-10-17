@@ -16,3 +16,4 @@
 - API credentials table has no client grants; only server functions read it via admin client — secrets never reach the browser.
 - Background bot: a managed schedule calls /api/public/jobs/bot-tick every minute, ticking every enabled account; a unique open-trade index prevents duplicate buys from overlapping ticks.
 - Home page runs a guest futures-style paper engine in the browser (src/hooks/use-local-paper.ts, localStorage); the signed-in server bot trades Long and Short in paper mode (futures-style margin) and stays long-only in Testnet because Testnet spot cannot short.
+- Shared PriceChart preserves the visible time range on price updates and separates drag-to-pan from explicit zoom controls — prevents live updates and gestures from unexpectedly changing zoom.

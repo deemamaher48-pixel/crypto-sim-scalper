@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-type TickLog = { at: Date; action: string; message: string };
+type TickLog = { at: Date; action: string; message: string; pnl?: number | undefined };
 
 function Dashboard() {
   const qc = useQueryClient();
@@ -76,9 +76,18 @@ function Dashboard() {
       busy.current = true;
       try {
         const r = await tick();
-        setLog((l) => [{ at: new Date(), action: r.action, message: r.message }, ...l].slice(0, 30));
+        let pnl: number | undefined;
+        if (r.action === "sell") {
+          const updatedTrades = await qc.fetchQuery({ ...tradesQuery, staleTime: 0 });
+          const latest = updatedTrades.filter((t) => t.status === "closed")
+            .sort((a, b) => (b.closed_at ?? "").localeCompare(a.closed_at ?? ""))[0];
+          if (latest?.pnl != null) pnl = Number(latest.pnl);
+        }
+        setLog((l) => [{ at: new Date(), action: r.action, message: r.message, pnl }, ...l].slice(0, 30));
         if (r.action === "buy" || r.action === "sell") {
-          toast.success(r.message);
+          if (pnl != null && pnl < 0) toast.error(r.message);
+          else if (pnl === 0 || (r.action === "sell" && pnl == null)) toast(r.message);
+          else toast.success(r.message);
           qc.invalidateQueries();
         }
       } catch (e) {
@@ -138,7 +147,7 @@ function Dashboard() {
             {log.map((l, i) => (
               <li key={i} className="flex gap-3 px-4 py-2">
                 <span className="num text-xs text-muted-foreground">{l.at.toLocaleTimeString("en-GB")}</span>
-                <span className={l.action === "buy" ? "text-bull" : l.action === "sell" ? "text-primary" : l.action === "error" ? "text-bear" : ""}>{l.message}</span>
+                <span className={l.pnl != null ? l.pnl > 0 ? "text-bull" : l.pnl < 0 ? "text-bear" : "text-muted-foreground" : l.action === "buy" ? "text-bull" : l.action === "error" ? "text-bear" : ""}>{l.message}</span>
               </li>
             ))}
           </ul>
@@ -196,7 +205,10 @@ function Dashboard() {
                 onClick={async () => {
                   try {
                     const r = await close({ data: { tradeId: open.id } });
-                    toast.success(`أُغلقت الصفقة: ${fmt(r.pnl)} USDT`);
+                    const message = `أُغلقت الصفقة: ${r.pnl > 0 ? "+" : ""}${fmt(r.pnl)} USDT`;
+                    if (r.pnl < 0) toast.error(message);
+                    else if (r.pnl > 0) toast.success(message);
+                    else toast(message);
                     qc.invalidateQueries();
                   } catch (e) {
                     toast.error(e instanceof Error ? e.message : "تعذر الإغلاق");
