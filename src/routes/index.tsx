@@ -32,9 +32,11 @@ const riskFields: { key: keyof LocalSettings; label: string; min: number; max: n
 ];
 
 function Home() {
-  const { klines, connected } = useLiveKlines("PAXGUSDT", "5m");
-  const { klines: k15 } = useLiveKlines("PAXGUSDT", "15m");
-  const bot = useLocalPaper(klines, k15);
+  const [sym, setSym] = useState<"BTCUSDT" | "PAXGUSDT">("BTCUSDT");
+  const gold = sym === "PAXGUSDT";
+  const { klines, connected } = useLiveKlines(sym, "5m");
+  const { klines: k15 } = useLiveKlines(sym, "15m");
+  const bot = useLocalPaper(klines, k15, gold);
   const { settings: s, ind, extras, open, price } = bot;
   const change = price - (klines.at(-2)?.close ?? price);
   const equity = bot.equity;
@@ -60,8 +62,15 @@ function Home() {
         <section className="min-w-0 space-y-4">
           <div className="flex flex-wrap items-end gap-6 rounded-lg border bg-card p-4">
             <div>
+              <div className="mb-2 flex gap-1">
+                {([["BTCUSDT", "بيتكوين BTC/USDT"], ["PAXGUSDT", "ذهب XAU/USD"]] as const).map(([v, l]) => (
+                  <Button key={v} size="sm" variant={sym === v ? "default" : "outline"} disabled={!!open && sym !== v}
+                    title={open && sym !== v ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
+                    onClick={() => setSym(v)}>{l}</Button>
+                ))}
+              </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                الذهب XAU/USD · 5m (فلتر 15m)
+                {gold ? "الذهب XAU/USD" : "BTC/USDT"} · 5m (فلتر 15m)
                 <span className={`h-2 w-2 rounded-full ${connected ? "bg-bull" : "bg-bear"}`} />
                 <span className="text-xs">{connected ? "سوق Binance مباشر" : "جارٍ الاتصال…"}</span>
               </div>

@@ -58,7 +58,8 @@ const DEFAULT: State = {
 
 export type BotStatus = { tone: "off" | "watch" | "blocked" | "open" | "ready"; text: string };
 
-export function useLocalPaper(klines: Kline[], klines15: Kline[]) {
+export function useLocalPaper(klines: Kline[], klines15: Kline[], gold = true) {
+  const rollover = (ms: number) => gold && inRolloverWindow(ms);
   const [st, setSt] = useState<State>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
   const lastCandle = useRef(0);

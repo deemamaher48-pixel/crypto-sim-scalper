@@ -39,3 +39,10 @@ describe("Smart VWAP & Momentum", () => {
     expect(smartCandleExit({ ...t, best: 103.6 }, c, 25 * 60_000)).toBeNull();
   });
 });
+
+import { describe as d2, it as i2, expect as e2 } from "vitest";
+d2("smartBracket for BTC", () => {
+  i2("uses raw 1.5×ATR stop without the gold $1.5–$4 clamp", () => {
+    e2(smartBracket("long", 60000, 100, false).stop).toBeCloseTo(59850);
+  });
+});
