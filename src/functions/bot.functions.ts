@@ -1,3 +1,4 @@
+import { inCooldown, smartBracket, smartCandleExit, smartSignal } from "@/lib/smart-scalp";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -18,8 +19,6 @@ import {
   type StrategyParams,
   type Side,
   computeExtras,
-  twoWaySignal,
-  sideBracket,
   sideExit,
   sidePnl,
 } from "@/lib/trading";
@@ -174,7 +173,10 @@ export async function tickUser(userId: string) {
       rsiOverbought: Number(settings.rsi_overbought),
       rsiOversold: Number(settings.rsi_oversold),
     };
-    const klines = await fetchKlines(settings.symbol, settings.interval, 200, paper ? "live" : "testnet");
+    // Paper mode runs Smart VWAP & Momentum on 5m with a 15m trend filter.
+    const klines = await fetchKlines(settings.symbol, paper ? "5m" : settings.interval, 300, paper ? "live" : "testnet");
+    const k15 = paper ? await fetchKlines(settings.symbol, "15m", 200, "live") : [];
+    const smart = paper ? smartSignal(klines.slice(0, -1), k15.slice(0, -1)) : null;
     const price = klines[klines.length - 1]!.close;
     const closed = klines.slice(0, -1).map((k) => k.close); // signals use closed candles only
     const ind = computeIndicators(closed, params);
@@ -183,15 +185,21 @@ export async function tickUser(userId: string) {
     const db = await admin();
     const { data: open } = await db
       .from("trades")
-      .select("id, symbol, qty, entry_price, stop_price, target_price, side")
+      .select("id, symbol, qty, entry_price, stop_price, target_price, side, opened_at")
       .eq("user_id", userId)
       .eq("status", "open")
       .limit(1)
       .maybeSingle();
 
     if (open) {
+      const oSide: Side = open.side === "short" ? "short" : "long";
+      const entryP = Number(open.entry_price);
       const reason = paper
-        ? sideExit(price, { side: open.side === "short" ? "short" : "long", stop: Number(open.stop_price), target: Number(open.target_price) }, ind)
+        ? sideExit(price, { side: oSide, stop: Number(open.stop_price), target: Number(open.target_price) }, null) ??
+          (smartCandleExit(
+            { side: oSide, entry: entryP, tp1: entryP + (Number(open.target_price) - entryP) / 2, tp1Hit: false, best: entryP, openedAt: open.opened_at },
+            klines.slice(0, -1), Date.now(),
+          ) ? "ema_cross" : null)
         : exitCheck(price, open, ind);
       if (reason) {
         const r = paper ? await paperSell(userId, open, price, reason) : await sellTrade(userId, creds!, open, reason);
@@ -208,8 +216,13 @@ export async function tickUser(userId: string) {
     let reasonText: string;
     if (paper) {
       if (!extras) return { action: "idle" as const, price, ind, message: "بيانات غير كافية للمؤشرات" };
-      const sig = twoWaySignal(ind, extras, params, false);
+      const sig = smart ?? { side: null, reason: "يجمع بيانات شموع 5m و15m…" };
       if (!sig.side) return { action: "wait" as const, price, ind, message: sig.reason };
+      const { data: lastLoss } = await db
+        .from("trades").select("closed_at").eq("user_id", userId).eq("status", "closed").lt("pnl", 0)
+        .order("closed_at", { ascending: false }).limit(1).maybeSingle();
+      if (inCooldown(lastLoss?.closed_at ? Date.parse(lastLoss.closed_at) : null, Date.now()))
+        return { action: "wait" as const, price, ind, message: "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
       side = sig.side;
       reasonText = sig.reason;
     } else {
@@ -262,7 +275,7 @@ export async function tickUser(userId: string) {
       qty = execQty - fee;
     }
     const b = paper
-      ? sideBracket(side, price, { atr: extras?.atr ?? null, slMult: 1.5, tpMult: 2.5, slPct: Number(settings.stop_loss_pct), tpPct: Number(settings.take_profit_pct) })
+      ? smartBracket(side, price, smart?.atr ?? extras!.atr)
       : bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
     const { error: insErr } = await db.from("trades").insert({
       user_id: userId,
