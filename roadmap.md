@@ -3,4 +3,4 @@
 - [x] Dashboard (chart, live price, bot panel), Settings, Trades pages
 - [x] Paper trading as default mode with ready virtual balance (no API keys needed); Testnet optional
 - [x] Chart & prices from the real live Binance market; only trades/balances simulated
-- [ ] Home page = live chart + dashboard + bot + paper balance, no login (local paper engine)
+- [x] Home page = live chart + dashboard + bot + paper balance, no login (local paper engine)
