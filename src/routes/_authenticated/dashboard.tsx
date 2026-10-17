@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-type TickLog = { at: Date; action: string; message: string; pnl?: number };
+type TickLog = { at: Date; action: string; message: string; pnl?: number | undefined };
 
 function Dashboard() {
   const qc = useQueryClient();

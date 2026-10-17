@@ -9,3 +9,4 @@
 - [x] Home futures-style paper: Long & Short, MACD + ATR (dynamic SL/TP), instant Long/Short buttons, chart shows side
 - [x] Add Stochastic, Bollinger Bands, VWAP, ADX, EMA 50/200 to indicators panel; ADX picks trend vs range
 - [ ] Show actual net profit in green and losses in red across trade results and notifications; distinguish reaching target from net profit.
+- [ ] Make chart dragging pan without accidental zoom; add explicit zoom and return-to-live controls.
