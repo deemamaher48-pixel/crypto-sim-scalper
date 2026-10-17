@@ -36,9 +36,11 @@ function Home() {
   const gold = sym === "PAXGUSDT";
   const { klines, connected } = useLiveKlines(sym, "5m");
   const { klines: k15 } = useLiveKlines(sym, "15m");
-  const bot = useLocalPaper(klines, k15, gold);
+  const { klines: k1 } = useLiveKlines(sym, "1m");
+  const bot = useLocalPaper(klines, k15, gold, k1);
+  const chartK = bot.sniper ? k1 : klines;
   const { settings: s, ind, extras, open, price } = bot;
-  const change = price - (klines.at(-2)?.close ?? price);
+  const change = price - (chartK.at(-2)?.close ?? price);
   const equity = bot.equity;
   const totalPnl = equity - START_BALANCE;
   const closed = bot.trades.filter((t) => t.closedAt);
@@ -68,9 +70,14 @@ function Home() {
                     title={open && sym !== v ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
                     onClick={() => setSym(v)}>{l}</Button>
                 ))}
+                <Button size="sm" variant={bot.sniper ? "default" : "outline"} disabled={!!open}
+                  title={open ? "سكّر الصفقة المفتوحة قبل التبديل" : undefined}
+                  onClick={() => bot.setSniper(!bot.sniper)}>
+                  صفقات سكالب على فريم الدقيقة: {bot.sniper ? "ON" : "OFF"}
+                </Button>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {gold ? "الذهب XAU/USD" : "BTC/USDT"} · 5m (فلتر 15m)
+                {gold ? "الذهب XAU/USD" : "BTC/USDT"} · {bot.sniper ? "1m (فلتر 5m)" : "5m (فلتر 15m)"}
                 <span className={`h-2 w-2 rounded-full ${connected ? "bg-bull" : "bg-bear"}`} />
                 <span className="text-xs">{connected ? "سوق Binance مباشر" : "جارٍ الاتصال…"}</span>
               </div>
@@ -87,7 +94,7 @@ function Home() {
           <div className="rounded-lg border bg-card p-2">
             <Suspense fallback={<div className="h-[420px]" />}>
               <PriceChart
-                klines={klines}
+                klines={chartK}
                 emaFast={s.emaFast}
                 emaSlow={s.emaSlow}
                 levels={open ? { entry: open.entry, stop: open.stop, target: open.target, side: open.side } : null}
