@@ -36,6 +36,13 @@
       "when": 1792269078402,
       "tag": "0004_durable_paper_service",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792269338259,
+      "tag": "0005_preserve_paper_trade_symbols",
+      "breakpoints": true
     }
   ]
 }
