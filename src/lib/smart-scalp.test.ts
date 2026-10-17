@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakevenStop, inCooldown, smartBracket, smartCandleExit, smartSignal, type Bar } from "./smart-scalp";
+import { breakevenStop, inRolloverWindow, inCooldown, smartBracket, smartCandleExit, smartSignal, type Bar } from "./smart-scalp";
 
 const bars = (n: number, f: (i: number) => Partial<Bar>): Bar[] =>
   Array.from({ length: n }, (_, i) => {
@@ -8,11 +8,16 @@ const bars = (n: number, f: (i: number) => Partial<Bar>): Bar[] =>
   });
 
 describe("Smart VWAP & Momentum", () => {
-  it("SL is 1.5×ATR capped at 0.7%; TP1 1.5×ATR; TP2 3×ATR", () => {
-    expect(smartBracket("long", 100, 0.2)).toEqual({ stop: 99.7, tp1: 100.3, target: 100.6 });
-    const wide = smartBracket("short", 100, 1);
-    expect(wide.stop).toBeCloseTo(100.7);
-    expect(wide.target).toBeCloseTo(97);
+  it("SL is 1.5×ATR clamped to $1.5–$4; TP1 1.5×ATR; TP2 3×ATR", () => {
+    const b = smartBracket("long", 2000, 2);
+    expect(b.stop).toBeCloseTo(1997); expect(b.tp1).toBeCloseTo(2003); expect(b.target).toBeCloseTo(2006);
+    expect(smartBracket("long", 2000, 0.5).stop).toBeCloseTo(1998.5);
+    expect(smartBracket("short", 2000, 5).stop).toBeCloseTo(2004);
+  });
+  it("rollover window 23:00–01:00 UTC blocks entries", () => {
+    expect(inRolloverWindow(Date.UTC(2026, 0, 1, 23, 30))).toBe(true);
+    expect(inRolloverWindow(Date.UTC(2026, 0, 1, 0, 59))).toBe(true);
+    expect(inRolloverWindow(Date.UTC(2026, 0, 1, 1, 0))).toBe(false);
   });
   it("cooldown blocks for 3 five-minute bars after a loss", () => {
     expect(inCooldown(0, 14 * 60_000)).toBe(true);

@@ -14,9 +14,9 @@ const PriceChart = lazy(() => import("@/components/PriceChart"));
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "سكالبر — شارت BTC/USDT مباشر وبوت سكالبينغ" },
-      { name: "description", content: "شارت BTC/USDT حقيقي لحظي مع بوت سكالبينغ آلي ورصيد محاكاة 10,000 USDT، بدون تسجيل." },
-      { property: "og:title", content: "سكالبر — شارت BTC/USDT مباشر وبوت سكالبينغ" },
+      { title: "سكالبر — شارت الذهب XAU/USD مباشر وبوت سكالبينغ" },
+      { name: "description", content: "شارت الذهب XAU/USD حقيقي لحظي مع بوت سكالبينغ آلي ورصيد محاكاة 10,000 USDT، بدون تسجيل." },
+      { property: "og:title", content: "سكالبر — شارت الذهب XAU/USD مباشر وبوت سكالبينغ" },
       { property: "og:description", content: "أسعار حقيقية لحظية، تداول افتراضي آلي بمؤشرات EMA و RSI." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -32,8 +32,8 @@ const riskFields: { key: keyof LocalSettings; label: string; min: number; max: n
 ];
 
 function Home() {
-  const { klines, connected } = useLiveKlines("BTCUSDT", "5m");
-  const { klines: k15 } = useLiveKlines("BTCUSDT", "15m");
+  const { klines, connected } = useLiveKlines("PAXGUSDT", "5m");
+  const { klines: k15 } = useLiveKlines("PAXGUSDT", "15m");
   const bot = useLocalPaper(klines, k15);
   const { settings: s, ind, extras, open, price } = bot;
   const change = price - (klines.at(-2)?.close ?? price);
@@ -61,7 +61,7 @@ function Home() {
           <div className="flex flex-wrap items-end gap-6 rounded-lg border bg-card p-4">
             <div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                BTC/USDT · 5m (فلتر 15m)
+                الذهب XAU/USD · 5m (فلتر 15m)
                 <span className={`h-2 w-2 rounded-full ${connected ? "bg-bull" : "bg-bear"}`} />
                 <span className="text-xs">{connected ? "سوق Binance مباشر" : "جارٍ الاتصال…"}</span>
               </div>

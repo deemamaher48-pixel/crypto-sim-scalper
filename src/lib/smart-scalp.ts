@@ -5,13 +5,15 @@ export type Bar = { time: number; open: number; high: number; low: number; close
 
 export const SMART = {
   minScore: 80,
-  volMult: 1.5,
+  volMult: 1.4,
+  spikeAtr: 2.5,
+  slMinUsd: 1.5,
+  slMaxUsd: 4,
   minBody: 0.6,
   maxVwapAtr: 2.5,
   cooldownBars: 3,
   barSec: 300,
   slAtr: 1.5,
-  slMaxPct: 0.7,
   tp1Atr: 1.5,
   tp2Atr: 3,
   tp1Close: 0.6,
@@ -60,6 +62,8 @@ export function smartSignal(c5: Bar[], c15: Bar[]): SmartSignal | null {
   if (!checks[0]![side]) return { ...base, side: null, reason: `يراقب — شرط اتجاه VWAP غير محقق (${best}%)` };
   if (!checks[1]![side]) return { ...base, side: null, reason: `يراقب — لا سيولة كافية أو شمعة ضعيفة (${best}%)` };
   if (best < SMART.minScore) return { ...base, side: null, reason: `يراقب — نقاط ${tag} ${best}% أقل من 80%` };
+  if (range > SMART.spikeAtr * a)
+    return { ...base, side: null, reason: "فلتر الأخبار — شمعة انفجارية أطول من 2.5×ATR" };
   if (Math.abs(bar.close - v5) > SMART.maxVwapAtr * a)
     return { ...base, side: null, reason: "منع المطاردة — السعر بعيد عن VWAP أكثر من 2.5×ATR" };
   return { ...base, side, reason: `Smart VWAP ${tag} — نقاط ${best}%` };
@@ -70,10 +74,16 @@ export function inCooldown(lastStopAt: number | null, now: number) {
   return lastStopAt != null && now - lastStopAt < SMART.cooldownBars * SMART.barSec * 1000;
 }
 
-/** SL 1.5×ATR (capped at 0.7%), TP1 1.5×ATR, TP2 3×ATR. */
+/** Gold daily close/reopen window 23:00–01:00 UTC: no new entries (wide spread). */
+export function inRolloverWindow(ms: number) {
+  const h = new Date(ms).getUTCHours();
+  return h >= 23 || h < 1;
+}
+
+/** SL 1.5×ATR clamped to $1.5–$4 (gold), TP1 1.5×ATR, TP2 3×ATR. */
 export function smartBracket(side: Side, entry: number, a: number) {
   const d = side === "long" ? 1 : -1;
-  const sl = Math.min(SMART.slAtr * a, (entry * SMART.slMaxPct) / 100);
+  const sl = Math.min(Math.max(SMART.slAtr * a, SMART.slMinUsd), SMART.slMaxUsd);
   return { stop: entry - d * sl, tp1: entry + d * SMART.tp1Atr * a, target: entry + d * SMART.tp2Atr * a };
 }
 
