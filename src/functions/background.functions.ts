@@ -1,3 +1,4 @@
+import { fetchNewsTimes } from '@/lib/news-guard';
 import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ async function locked(userId:string, change:(s:PaperState)=>Promise<{state:Paper
  }catch(e){await client.from('paper_services').update({lease_token:null,lease_until:null,last_message:'تعذر التحديث — سيحاول البوت مجدداً'}).eq('user_id',userId).eq('lease_token',token);throw e;}
 }
 export async function tickBackgroundUser(userId:string,manual?:'long'|'short'|'close'){
- return locked(userId,async s=>{const [bars,filter]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200)]);return stepPaper(s,bars,filter,Date.now(),manual);},true);
+ return locked(userId,async s=>{const [bars,filter,news]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200),fetchNewsTimes()]);return stepPaper(s,bars,filter,Date.now(),manual,news);},true);
 }
 export const getBackground = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  const {data,error}=await context.supabase.from('paper_services').select('state,last_tick_at,last_message').eq('user_id',context.userId).maybeSingle();if(error)throw error;return data?{state:data.state as unknown as PaperState,lastTickAt:data.last_tick_at,message:data.last_message}:null;
