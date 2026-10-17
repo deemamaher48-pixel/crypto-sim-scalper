@@ -103,3 +103,15 @@
     unicode-bidi: isolate;
   }
 }
+
+/* Notification result colors follow net PnL, not the exit reason. */
+.toaster [data-sonner-toast][data-type="success"] {
+  color: var(--bull);
+  border-color: var(--bull);
+  background: var(--background);
+}
+.toaster [data-sonner-toast][data-type="error"] {
+  color: var(--bear);
+  border-color: var(--bear);
+  background: var(--background);
+}

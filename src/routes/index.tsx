@@ -104,7 +104,7 @@ function Home() {
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b">
-                    {["الوقت", "الاتجاه", "الدخول", "الخروج", "الربح", "السبب"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
+                    {["الوقت", "الاتجاه", "الدخول", "الخروج", "صافي الربح", "السبب"].map((h) => <th key={h} className="px-3 py-2 text-start font-medium">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -114,8 +114,8 @@ function Home() {
                       <td className="px-3 py-2"><SideTag side={t.side} /></td>
                       <td className="num px-3 py-2">{fmt(t.entry)}</td>
                       <td className="num px-3 py-2">{fmt(t.exit)}</td>
-                      <td className={`num px-3 py-2 ${t.pnl == null ? "" : t.pnl >= 0 ? "text-bull" : "text-bear"}`}>{t.closedAt ? fmt(t.pnl) : "مفتوحة"}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{t.exitReason ? exitReasonLabel[t.exitReason] : t.entryReason}</td>
+                      <td className={`num px-3 py-2 font-semibold ${t.pnl == null || t.pnl === 0 ? "text-muted-foreground" : t.pnl > 0 ? "text-bull" : "text-bear"}`}>{t.closedAt ? `${(t.pnl ?? 0) > 0 ? "+" : ""}${fmt(t.pnl)}` : "مفتوحة"}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{t.exitReason === "take_profit" && (t.pnl ?? 0) < 0 ? "بلوغ الهدف — خسارة بعد الرسوم" : t.exitReason ? exitReasonLabel[t.exitReason] : t.entryReason}</td>
                     </tr>
                   ))}
                   {bot.trades.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">شغّل البوت لتبدأ الصفقات.</td></tr>}
