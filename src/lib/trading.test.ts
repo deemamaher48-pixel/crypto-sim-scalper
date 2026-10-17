@@ -52,10 +52,10 @@ describe("trading rules", () => {
 
 import { paperBuy, paperSell } from "./trading";
 describe("paper trading", () => {
-  it("charges 0.1% per side so a flat round trip loses about 0.2%", () => {
+  it("charges only the MT5-style spread so a flat round trip loses about 0.01%", () => {
     const b = paperBuy(100, 50000);
     const s = paperSell(b.qty, b.entry, 50000);
-    expect(s.pnl).toBeCloseTo(-0.1999, 3);
+    expect(s.pnl).toBeCloseTo(-0.01, 3);
   });
 });
 
@@ -74,9 +74,9 @@ describe("fast scalping mode", () => {
 
 import { atr, macd, sideBracket, sideExit, sidePnl } from "./trading";
 describe("long & short", () => {
-  it("short profits when price falls, net of 0.1% fees per side", () => {
-    expect(sidePnl("short", 1, 100, 90)).toBeCloseTo(10 - 0.19);
-    expect(sidePnl("long", 1, 100, 90)).toBeCloseTo(-10 - 0.19);
+  it("short profits when price falls, net of MT5-style spread (0.005% per side)", () => {
+    expect(sidePnl("short", 1, 100, 90)).toBeCloseTo(10 - 0.0095);
+    expect(sidePnl("long", 1, 100, 90)).toBeCloseTo(-10 - 0.0095);
   });
   it("short stop is above entry and target below, sized by ATR", () => {
     const b = sideBracket("short", 100, { atr: 2, slMult: 1.5, tpMult: 2.5, slPct: 0.5, tpPct: 1 });

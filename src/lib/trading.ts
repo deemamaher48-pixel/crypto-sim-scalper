@@ -138,7 +138,8 @@ export function floorToStep(qty: number, step: number): number {
   return Number(v.toFixed(decimals));
 }
 
-export const PAPER_FEE = 0.001; // 0.1% per side, like Binance spot
+/** MT5/broker-style cost: half of a ~0.01% spread charged on each side (no 0.1% commission). */
+export const PAPER_FEE = 0.00005;
 
 /** Simulated market buy of `sizeUsdt` at `price`; the buy fee is taken from the received quantity. */
 export function paperBuy(sizeUsdt: number, price: number) {
@@ -362,7 +363,7 @@ export function sideExit(
   return null;
 }
 
-/** Futures-style PnL net of 0.1% fee on entry and exit notional. */
+/** Futures-style PnL net of the MT5-style spread cost on entry and exit. */
 export function sidePnl(side: Side, qty: number, entry: number, exit: number) {
   const dir = side === "long" ? 1 : -1;
   return dir * (exit - entry) * qty - PAPER_FEE * (entry + exit) * qty;
