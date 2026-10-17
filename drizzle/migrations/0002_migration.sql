@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX trades_one_open_per_user ON public.trades(user_id) WHERE status = 'open';

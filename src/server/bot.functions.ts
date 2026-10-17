@@ -152,9 +152,11 @@ async function paperSell(userId: string, trade: TradeRow, price: number, reason:
 
 export const runBotTick = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { data: settings } = await supabase.from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
+  .handler(async ({ context }) => tickUser(context.userId));
+
+/** One bot step for one user. Called by the open dashboard and by the background job. */
+export async function tickUser(userId: string) {
+    const { data: settings } = await (await admin()).from("bot_settings").select("*").eq("user_id", userId).maybeSingle();
     if (!settings) return { action: "idle" as const, message: "احفظ الإعدادات أولاً" };
     const paper = settings.mode !== "testnet";
     const creds = paper ? null : await loadCreds(userId);
@@ -223,10 +225,6 @@ export const runBotTick = createServerFn({ method: "POST" })
     if (paper) {
       qty = (size / price) * (1 - PAPER_FEE);
       entry = size / qty; // fee-inclusive cost basis
-      await db
-        .from("bot_settings")
-        .update({ paper_usdt: freeUsdt - size, paper_btc: Number(settings.paper_btc) + qty })
-        .eq("user_id", userId);
     } else {
       const order = await signedRequest<OrderResult>(creds!, "POST", "/api/v3/order", {
         symbol: settings.symbol,
@@ -244,7 +242,7 @@ export const runBotTick = createServerFn({ method: "POST" })
       qty = execQty - fee;
     }
     const b = bracket(price, Number(settings.stop_loss_pct), Number(settings.take_profit_pct));
-    await db.from("trades").insert({
+    const { error: insErr } = await db.from("trades").insert({
       user_id: userId,
       symbol: settings.symbol,
       mode: paper ? "paper" : "testnet",
@@ -254,8 +252,15 @@ export const runBotTick = createServerFn({ method: "POST" })
       target_price: b.target,
       entry_reason: sig.reason,
     });
+    // Unique open-trade index rejects a duplicate when the page and background job tick together.
+    if (insErr) return { action: "hold" as const, price, ind, message: "صفقة مفتوحة بالفعل" };
+    if (paper)
+      await db
+        .from("bot_settings")
+        .update({ paper_usdt: freeUsdt - size, paper_btc: Number(settings.paper_btc) + qty })
+        .eq("user_id", userId);
     return { action: "buy" as const, price, ind, message: `شراء عند ${price.toFixed(2)} — ${sig.reason}` };
-  });
+}
 
 export const resetPaperAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
