@@ -144,7 +144,7 @@ export function useLocalPaper(klines: Kline[]) {
     price,
     ind,
     open,
-    status: st.enabled || open ? status : "البوت متوقف",
+    status: !st.enabled && !open ? "البوت متوقف" : status === "البوت متوقف" ? "بانتظار إغلاق الشمعة التالية…" : status,
     setEnabled: (enabled: boolean) => setSt((s) => ({ ...s, enabled })),
     updateSettings: (p: Partial<LocalSettings>) => setSt((s) => ({ ...s, settings: { ...s.settings, ...p } })),
     closeNow: () => close("manual"),

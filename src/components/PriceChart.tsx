@@ -50,10 +50,16 @@ export default function PriceChart({
     const grid = cssColor("--border");
     const c = createChart(ref.current, {
       autoSize: true,
-      localization: { locale: "en-US" },
+      localization: {
+        locale: "en-US",
+        priceFormatter: (p: number) => p.toFixed(2),
+        timeFormatter: (t: number) => new Date(t * 1000).toISOString().slice(11, 16),
+      },
       layout: { background: { color: "transparent" }, textColor: fg, fontFamily: "JetBrains Mono" },
       grid: { vertLines: { color: grid }, horzLines: { color: grid } },
-      timeScale: { timeVisible: true, secondsVisible: false, borderColor: grid },
+      timeScale: {
+        tickMarkFormatter: (t: number) => new Date(t * 1000).toISOString().slice(11, 16),
+        timeVisible: true, secondsVisible: false, borderColor: grid },
       rightPriceScale: { borderColor: grid },
     });
     const bull = cssColor("--bull");
