@@ -2,20 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { prependTrade, tradeOutcome } from "@/lib/trade-history";
 import type { Kline } from "@/lib/binance";
+import { computeExtras, computeIndicators, riskGate, sidePnl, type Side, type StrategyParams } from "@/lib/trading";
 import {
-  computeExtras,
-  computeIndicators,
-  riskGate,
-  sideBracket,
-  sideExit,
-  sidePnl,
-  twoWaySignal,
-  type ExitReason,
-  type Side,
-  type StrategyParams,
-} from "@/lib/trading";
+  SMART, breakevenStop, inCooldown, smartBracket, smartCandleExit, smartSignal, type SmartSignal,
+} from "@/lib/smart-scalp";
 
-// Guest futures-style paper engine: Long & Short on live prices, state kept in localStorage.
+// Guest futures-style paper engine running Smart VWAP & Momentum Scalping (5m + 15m) on live prices; state in localStorage.
 export type LocalSettings = StrategyParams & {
   stopLossPct: number;
   takeProfitPct: number;
@@ -27,18 +19,24 @@ export type LocalSettings = StrategyParams & {
   atrSlMult: number;
   atrTpMult: number;
 };
+export type LocalExit = "stop_loss" | "take_profit" | "ema_cross" | "manual" | "time_stop" | "vwap_break" | "trailing";
 export type LocalTrade = {
   id: string;
   side: Side;
   size: number; // USDT margin/notional
   qty: number;
+  remainingQty?: number;
+  realized?: number; // net pnl already booked by the TP1 partial close
+  tp1?: number;
+  tp1Hit?: boolean;
+  best?: number; // most favourable price seen
   entry: number;
   stop: number;
   target: number;
   exit?: number;
   pnl?: number;
   entryReason: string;
-  exitReason?: ExitReason;
+  exitReason?: LocalExit;
   openedAt: string;
   closedAt?: string;
 };
@@ -48,9 +46,9 @@ export const START_BALANCE = 10000;
 const KEY = "scalper-paper-v1";
 const DEFAULT: State = {
   settings: {
-    emaFast: 9, emaSlow: 21, rsiPeriod: 14, rsiOverbought: 70, rsiOversold: 30,
+    emaFast: 9, emaSlow: 21, rsiPeriod: 9, rsiOverbought: 70, rsiOversold: 30,
     stopLossPct: 0.5, takeProfitPct: 1, positionUsdt: 100, maxTradesPerDay: 20, maxDailyLossUsdt: 50,
-    fastMode: false, useAtr: true, atrSlMult: 1.5, atrTpMult: 2.5,
+    fastMode: false, useAtr: true, atrSlMult: 1.5, atrTpMult: 3,
   },
   usdt: START_BALANCE,
   btc: 0,
@@ -60,7 +58,7 @@ const DEFAULT: State = {
 
 export type BotStatus = { tone: "off" | "watch" | "blocked" | "open" | "ready"; text: string };
 
-export function useLocalPaper(klines: Kline[]) {
+export function useLocalPaper(klines: Kline[], klines15: Kline[]) {
   const [st, setSt] = useState<State>(DEFAULT);
   const [loaded, setLoaded] = useState(false);
   const lastCandle = useRef(0);
@@ -73,8 +71,7 @@ export function useLocalPaper(klines: Kline[]) {
         setSt({
           ...DEFAULT,
           ...saved,
-          settings: { ...DEFAULT.settings, ...saved.settings },
-          // Trades saved before Long/Short support were spot longs.
+          settings: { ...DEFAULT.settings, ...saved.settings, emaFast: 9, emaSlow: 21, rsiPeriod: 9 },
           trades: (saved.trades ?? []).map((t) => ({ ...t, side: t.side ?? "long", size: t.size ?? t.qty * t.entry })),
         });
       }
@@ -88,22 +85,49 @@ export function useLocalPaper(klines: Kline[]) {
   const price = klines.at(-1)?.close ?? 0;
   const closedCount = klines.length - 1;
   const closedBars = useMemo(() => klines.slice(0, -1), [closedCount, klines.at(-2)?.close]);
+  const closed15 = useMemo(() => klines15.slice(0, -1), [klines15.length, klines15.at(-2)?.close]);
   const ind = useMemo(() => computeIndicators(closedBars.map((k) => k.close), st.settings), [closedBars, st.settings]);
   const extras = useMemo(() => computeExtras(closedBars), [closedBars]);
+  const signal: SmartSignal | null = useMemo(() => smartSignal(closedBars, closed15), [closedBars, closed15]);
   const open = st.trades.find((t) => !t.closedAt);
-  const unrealized = open && price ? sidePnl(open.side, open.qty, open.entry, price) : 0;
+  const rem = (t: LocalTrade) => t.remainingQty ?? t.qty;
+  const unrealized = open && price ? (open.realized ?? 0) + sidePnl(open.side, rem(open), open.entry, price) : 0;
+  const lastStop = st.trades.find((t) => t.closedAt && (t.pnl ?? 0) < 0);
+  const lastStopAt = lastStop?.closedAt ? Date.parse(lastStop.closedAt) : null;
 
-  function close(reason: ExitReason, at = price) {
+  function close(reason: LocalExit, at = price) {
     setSt((s) => {
       const t = s.trades.find((x) => !x.closedAt);
       if (!t || !at) return s;
-      const pnl = sidePnl(t.side, t.qty, t.entry, at);
+      const q = rem(t);
+      const part = sidePnl(t.side, q, t.entry, at);
+      const pnl = (t.realized ?? 0) + part;
       toast[pnl > 0 ? "success" : pnl < 0 ? "error" : "message"](tradeOutcome(pnl));
       return {
         ...s,
-        usdt: s.usdt + t.size + pnl,
+        usdt: s.usdt + t.size * (q / t.qty) + part,
         trades: s.trades.map((x) =>
-          x.id === t.id ? { ...x, exit: at, pnl, exitReason: reason, closedAt: new Date().toISOString() } : x,
+          x.id === t.id ? { ...x, exit: at, pnl, remainingQty: 0, exitReason: reason, closedAt: new Date().toISOString() } : x,
+        ),
+      };
+    });
+  }
+
+  /** TP1: book 60% and move the stop to breakeven + spread. */
+  function takeTp1(at: number) {
+    setSt((s) => {
+      const t = s.trades.find((x) => !x.closedAt);
+      if (!t || t.tp1Hit) return s;
+      const q = t.qty * SMART.tp1Close;
+      const part = sidePnl(t.side, q, t.entry, at);
+      toast.success(`الهدف الأول تحقق — إغلاق 60% بربح ${part.toFixed(2)}$ ونقل الوقف للدخول`);
+      return {
+        ...s,
+        usdt: s.usdt + t.size * SMART.tp1Close + part,
+        trades: s.trades.map((x) =>
+          x.id === t.id
+            ? { ...x, tp1Hit: true, realized: part, remainingQty: t.qty - q, stop: breakevenStop(t.side, t.entry) }
+            : x,
         ),
       };
     });
@@ -125,64 +149,65 @@ export function useLocalPaper(klines: Kline[]) {
 
   function openTrade(side: Side, reason: string) {
     const g = gate();
-    if (!g.ok || !price) {
-      toast.error(g.reason || "السعر غير متاح بعد");
+    const a = signal?.atr ?? extras?.atr;
+    if (!g.ok || !price || !a) {
+      toast.error(g.reason || "السعر أو ATR غير متاح بعد");
       return;
     }
     const s = st.settings;
-    const br = sideBracket(side, price, {
-      atr: s.useAtr ? (extras?.atr ?? null) : null,
-      slMult: s.atrSlMult,
-      tpMult: s.atrTpMult,
-      slPct: s.stopLossPct,
-      tpPct: s.takeProfitPct,
-    });
+    const br = smartBracket(side, price, a);
     toast.success(`${side === "long" ? "شراء Long" : "بيع Short"} عند ${price.toFixed(2)} — ${reason}`);
     setSt((x) => ({
       ...x,
       usdt: x.usdt - s.positionUsdt,
-      trades: prependTrade(x.trades,
-        {
-          id: crypto.randomUUID(), side, size: s.positionUsdt, qty: s.positionUsdt / price, entry: price,
-          stop: br.stop, target: br.target, entryReason: reason, openedAt: new Date().toISOString(),
-        },
-      ),
+      trades: prependTrade(x.trades, {
+        id: crypto.randomUUID(), side, size: s.positionUsdt, qty: s.positionUsdt / price, remainingQty: s.positionUsdt / price,
+        realized: 0, tp1: br.tp1, tp1Hit: false, best: price, entry: price,
+        stop: br.stop, target: br.target, entryReason: reason, openedAt: new Date().toISOString(),
+      }),
     }));
   }
 
   let status: BotStatus;
-  if (open) status = { tone: "open", text: `صفقة ${open.side === "long" ? "Long" : "Short"} مفتوحة — يراقب الوقف والهدف لحظياً` };
+  if (open) status = { tone: "open", text: `صفقة ${open.side === "long" ? "Long" : "Short"} مفتوحة${open.tp1Hit ? " — الهدف الأول تحقق، الوقف على الدخول" : " — يراقب الوقف والأهداف"}` };
   else if (!st.enabled) status = { tone: "off", text: "البوت متوقف — شغّله ليبدأ مراقبة السوق" };
-  else if (!ind || !extras) status = { tone: "watch", text: "يجمع بيانات الشموع لحساب المؤشرات…" };
+  else if (!signal) status = { tone: "watch", text: "يجمع بيانات شموع 5m و15m…" };
   else {
     const g = gate();
-    const sig = twoWaySignal(ind, extras, st.settings, st.settings.fastMode);
     if (!g.ok) status = { tone: "blocked", text: `متوقف عن الدخول — ${g.reason}` };
-    else if (sig.side) status = { tone: "ready", text: `إشارة ${sig.side === "long" ? "Long" : "Short"} — تنفيذ عند إغلاق الشمعة: ${sig.reason}` };
-    else status = { tone: "watch", text: sig.reason };
+    else if (inCooldown(lastStopAt, Date.now())) status = { tone: "blocked", text: "فترة تبريد بعد وقف الخسارة (15 دقيقة)" };
+    else if (signal.side) status = { tone: "ready", text: signal.reason };
+    else status = { tone: "watch", text: signal.reason };
   }
 
-  // Stop/target checked on every live price update.
+  // Stop / TP1 / TP2 checked on every live price update; also track the best price for the time-stop.
   useEffect(() => {
     if (!loaded || !open || !price) return;
-    const reason = sideExit(price, open, null);
-    if (reason) close(reason);
-  }, [price, open?.id, loaded]);
+    const d = open.side === "long" ? 1 : -1;
+    if (d * (price - open.stop) <= 0) return close("stop_loss", price);
+    if (d * (price - open.target) >= 0) return close("take_profit", price);
+    if (!open.tp1Hit && open.tp1 != null && d * (price - open.tp1) >= 0) return takeTp1(price);
+    if (open.best == null || d * (price - open.best) > 0)
+      setSt((s) => ({ ...s, trades: s.trades.map((x) => (x.id === open.id ? { ...x, best: price } : x)) }));
+  }, [price, open?.id, open?.tp1Hit, loaded]);
 
-  // Entries and EMA-cross exits: once per closed candle.
+  // Entries and candle-close exits: once per closed 5m candle.
   useEffect(() => {
-    if (!loaded || !ind || !extras || !price) return;
-    const candleTime = klines.at(-2)?.time ?? 0;
+    if (!loaded || !price || !closedBars.length) return;
+    const candleTime = closedBars.at(-1)!.time;
     if (candleTime === lastCandle.current) return;
     lastCandle.current = candleTime;
     if (open) {
-      if (sideExit(price, open, ind) === "ema_cross") close("ema_cross");
+      const r = smartCandleExit(
+        { side: open.side, entry: open.entry, tp1: open.tp1 ?? open.target, tp1Hit: !!open.tp1Hit, best: open.best ?? open.entry, openedAt: open.openedAt },
+        closedBars, Date.now(),
+      );
+      if (r) close(r);
       return;
     }
-    if (!st.enabled) return;
-    const sig = twoWaySignal(ind, extras, st.settings, st.settings.fastMode);
-    if (sig.side) openTrade(sig.side, sig.reason);
-  }, [closedCount, ind, extras, loaded, st.enabled]);
+    if (!st.enabled || !signal?.side || !gate().ok || inCooldown(lastStopAt, Date.now())) return;
+    openTrade(signal.side, signal.reason);
+  }, [closedCount, signal, loaded, st.enabled]);
 
   return {
     ...st,
@@ -190,9 +215,10 @@ export function useLocalPaper(klines: Kline[]) {
     price,
     ind,
     extras,
+    signal,
     open,
     unrealized,
-    equity: st.usdt + (open ? open.size + unrealized : 0),
+    equity: st.usdt + (open ? open.size * (rem(open) / open.qty) + sidePnl(open.side, rem(open), open.entry, price || open.entry) : 0),
     status,
     setEnabled: (enabled: boolean) => setSt((s) => ({ ...s, enabled })),
     updateSettings: (p: Partial<LocalSettings>) => setSt((s) => ({ ...s, settings: { ...s.settings, ...p } })),
