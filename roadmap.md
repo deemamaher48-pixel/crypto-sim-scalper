@@ -1,5 +1,6 @@
 # Roadmap
-- [ ] Home background paper service, permanent account trade history, authenticated controls, and closed-page verification.
+- [x] Home background paper service, permanent account trade history and authenticated controls.
+- [ ] Verify signed-in closed-page flow: blocked by no registered account; published deployment needed for scheduled execution.
 - [x] Cloud, login, tables, trading logic + tests
 - [x] Dashboard (chart, live price, bot panel), Settings, Trades pages
 - [x] Paper trading as default mode with ready virtual balance (no API keys needed); Testnet optional
