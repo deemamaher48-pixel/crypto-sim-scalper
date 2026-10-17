@@ -14,7 +14,135 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      api_credentials: {
+        Row: {
+          api_key: string
+          api_secret: string
+          testnet: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key: string
+          api_secret: string
+          testnet?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string
+          api_secret?: string
+          testnet?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bot_settings: {
+        Row: {
+          ema_fast: number
+          ema_slow: number
+          enabled: boolean
+          interval: string
+          max_daily_loss_usdt: number
+          max_trades_per_day: number
+          position_usdt: number
+          rsi_overbought: number
+          rsi_oversold: number
+          rsi_period: number
+          stop_loss_pct: number
+          symbol: string
+          take_profit_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ema_fast?: number
+          ema_slow?: number
+          enabled?: boolean
+          interval?: string
+          max_daily_loss_usdt?: number
+          max_trades_per_day?: number
+          position_usdt?: number
+          rsi_overbought?: number
+          rsi_oversold?: number
+          rsi_period?: number
+          stop_loss_pct?: number
+          symbol?: string
+          take_profit_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ema_fast?: number
+          ema_slow?: number
+          enabled?: boolean
+          interval?: string
+          max_daily_loss_usdt?: number
+          max_trades_per_day?: number
+          position_usdt?: number
+          rsi_overbought?: number
+          rsi_oversold?: number
+          rsi_period?: number
+          stop_loss_pct?: number
+          symbol?: string
+          take_profit_pct?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      trades: {
+        Row: {
+          closed_at: string | null
+          entry_price: number
+          entry_reason: string | null
+          exit_price: number | null
+          exit_reason: string | null
+          id: string
+          opened_at: string
+          pnl: number | null
+          qty: number
+          status: string
+          stop_price: number
+          symbol: string
+          target_price: number
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          entry_price: number
+          entry_reason?: string | null
+          exit_price?: number | null
+          exit_reason?: string | null
+          id?: string
+          opened_at?: string
+          pnl?: number | null
+          qty: number
+          status?: string
+          stop_price: number
+          symbol: string
+          target_price: number
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          entry_price?: number
+          entry_reason?: string | null
+          exit_price?: number | null
+          exit_reason?: string | null
+          id?: string
+          opened_at?: string
+          pnl?: number | null
+          qty?: number
+          status?: string
+          stop_price?: number
+          symbol?: string
+          target_price?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
