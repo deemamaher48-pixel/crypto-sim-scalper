@@ -95,7 +95,7 @@ function Dashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const closedToday = trades.filter((t) => t.status === "closed" && t.closed_at?.startsWith(today));
   const pnlToday = closedToday.reduce((a, t) => a + Number(t.pnl ?? 0), 0);
-  const openPnl = open ? (price - Number(open.entry_price)) * Number(open.qty) : 0;
+  const openPnl = open ? (open.side === "short" ? -1 : 1) * (price - Number(open.entry_price)) * Number(open.qty) : 0;
   const paper = s.mode !== "testnet";
   const equity = Number(s.paper_usdt) + Number(s.paper_btc) * price;
   const change = price - prevClose;
@@ -183,6 +183,7 @@ function Dashboard() {
           <div className="mb-3 text-sm font-semibold">الصفقة المفتوحة</div>
           {open ? (
             <div className="space-y-2 text-sm">
+              <Row k="الاتجاه" v={open.side === "short" ? "Short ↓" : "Long ↑"} cls={open.side === "short" ? "text-bear" : "text-bull"} />
               <Row k="سعر الدخول" v={fmt(open.entry_price)} />
               <Row k="الكمية" v={fmt(open.qty, 5)} />
               <Row k="وقف الخسارة" v={fmt(open.stop_price)} cls="text-bear" />
