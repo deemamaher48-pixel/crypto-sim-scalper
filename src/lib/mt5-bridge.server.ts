@@ -5,12 +5,12 @@ async function sha(s: string) {
 
 /** Returns a 401 Response when the caller lacks the bridge key, otherwise null. */
 export async function verifyBridge(request: Request): Promise<Response | null> {
-  const key = process.env.MT5_BRIDGE_API_KEY;
+  const key = process.env["MT5_BRIDGE_API_KEY"];
   if (!key) return new Response("Bridge not configured", { status: 503 });
   const got = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   const [a, b] = await Promise.all([sha(got), sha(key)]);
   let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  for (let i = 0; i < a.length; i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
   return diff === 0 && got.length > 0 ? null : new Response("Unauthorized", { status: 401 });
 }
 
