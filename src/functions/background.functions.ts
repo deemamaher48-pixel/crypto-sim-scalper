@@ -6,6 +6,7 @@ import { initialPaperState, stepPaper, type PaperState } from '@/lib/background-
 import { fetchKlines } from '@/lib/binance';
 import type { Json } from '@/integrations/supabase/types';
 async function db(){return (await import('@/integrations/supabase/client.server')).supabaseAdmin;}
+export async function mutatePaper(userId:string, change:(s:PaperState)=>Promise<{state:PaperState;message:string}>){return locked(userId,change);}
 async function locked(userId:string, change:(s:PaperState)=>Promise<{state:PaperState;message:string}>, tick=false){
  const client=await db(), token=crypto.randomUUID();
  const {data:claimed,error}=await client.rpc('claim_paper_service',{p_user:userId,p_token:token});if(error)throw error;if(!claimed)throw new Error('البوت يعالج طلباً آخر، جرّب بعد قليل');
@@ -17,7 +18,10 @@ async function locked(userId:string, change:(s:PaperState)=>Promise<{state:Paper
  }catch(e){await client.from('paper_services').update({lease_token:null,lease_until:null,last_message:'تعذر التحديث — سيحاول البوت مجدداً'}).eq('user_id',userId).eq('lease_token',token);throw e;}
 }
 export async function tickBackgroundUser(userId:string,manual?:'long'|'short'|'close'){
- return locked(userId,async s=>{const [bars,filter,news]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200),fetchNewsTimes()]);return stepPaper(s,bars,filter,Date.now(),manual,news);},true);
+ const before=new Map<string,{closed:boolean;tp1:boolean}>();
+ const r=await locked(userId,async s=>{s.trades.slice(0,5).forEach(t=>before.set(t.id,{closed:!!t.closedAt,tp1:!!t.tp1Hit}));const [bars,filter,news]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200),fetchNewsTimes()]);return stepPaper(s,bars,filter,Date.now(),manual,news);},true);
+ try{const {notifyTradeChanges}=await import('@/lib/telegram.server');await notifyTradeChanges(userId,before,r.state);}catch(e){console.error('telegram notify',e);}
+ return r;
 }
 export const getBackground = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  const {data,error}=await context.supabase.from('paper_services').select('state,last_tick_at,last_message').eq('user_id',context.userId).maybeSingle();if(error)throw error;return data?{state:data.state as unknown as PaperState,lastTickAt:data.last_tick_at,message:data.last_message}:null;

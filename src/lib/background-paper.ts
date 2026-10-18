@@ -4,7 +4,7 @@ import type { Kline } from '@/lib/binance';
 import { sidePnl, riskGate } from '@/lib/trading';
 import { SMART, smartSignal, smartBracket, smartCandleExit, breakevenStop, inCooldown, inRolloverWindow } from '@/lib/smart-scalp';
 import { SNIPER, sniperSignal, sniperBracket, sniperCandleExit, fastBreakeven, sniperCooldown, breakerTripped } from '@/lib/sniper-scalp';
-export type PaperState = { settings: LocalSettings; usdt: number; btc: number; enabled: boolean; trades: LocalTrade[]; symbol: 'BTCUSDT' | 'PAXGUSDT'; sniper: boolean; sniperResetAt: number; sniperPausedUntil: number; lastCandle: number };
+export type PaperState = { settings: LocalSettings; usdt: number; btc: number; enabled: boolean; trades: LocalTrade[]; symbol: 'BTCUSDT' | 'PAXGUSDT'; sniper: boolean; sniperResetAt: number; sniperPausedUntil: number; lastCandle: number; newsShield?: boolean };
 export function initialPaperState(): PaperState { return { settings: { emaFast:9,emaSlow:21,rsiPeriod:9,rsiOverbought:70,rsiOversold:30,stopLossPct:.5,takeProfitPct:1,positionUsdt:100,maxTradesPerDay:20,maxDailyLossUsdt:50,fastMode:false,useAtr:true,atrSlMult:1.5,atrTpMult:3 }, usdt:10000,btc:0,enabled:false,trades:[],symbol:'BTCUSDT',sniper:false,sniperResetAt:0,sniperPausedUntil:0,lastCandle:0 }; }
 export function stepPaper(input: PaperState, bars: Kline[], filter: Kline[], now: number, manual?: 'long' | 'short' | 'close', newsTimes: number[] = []) {
  const s = structuredClone(input), price = bars.at(-1)?.close;
@@ -34,7 +34,7 @@ export function stepPaper(input: PaperState, bars: Kline[], filter: Kline[], now
  const loss=s.trades.find(x=>x.closedAt&&(x.pnl??0)<0&&(x.mode==='sniper')===s.sniper);
  const lossAt=loss?.closedAt?Date.parse(loss.closedAt):null;
  const cooling=s.sniper?sniperCooldown(lossAt!=null&&lossAt<s.sniperResetAt?null:lossAt,now):inCooldown(lossAt,now);
- if(!manual && newsFreeze(newsTimes,now)!=null) return {state:s,message:'تجميد مؤقت 10 دقائق — خبر اقتصادي قوي'};
+ if(!manual && s.newsShield!==false && newsFreeze(newsTimes,now)!=null) return {state:s,message:'تجميد مؤقت 10 دقائق — خبر اقتصادي قوي'};
  if(!manual && (cooling || s.sniper&&s.sniperPausedUntil>now || s.symbol==='PAXGUSDT'&&inRolloverWindow(now))) return {state:s,message:'الدخول متوقف — تبريد أو قاطع أمان أو وقت إغلاق الذهب'};
  const today=s.trades.filter(x=>x.openedAt.startsWith(new Date(now).toISOString().slice(0,10)));
  const gate=riskGate({hasOpenTrade:false,tradesToday:today.length,maxTradesPerDay:s.settings.maxTradesPerDay,pnlToday:today.reduce((a,t)=>a+(t.pnl??0),0),maxDailyLossUsdt:s.settings.maxDailyLossUsdt,positionUsdt:s.settings.positionUsdt,freeUsdt:s.usdt});
