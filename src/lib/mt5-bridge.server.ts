@@ -19,3 +19,12 @@ export async function bridgeDb() {
   // mt5_* tables are server-only and not in generated types.
   return supabaseAdmin as unknown as { from: (t: string) => any };
 }
+
+/** Shared-storage rate limit (DB fixed window). Returns 429 Response when exceeded. */
+export async function rateLimit(request: Request, name: string, max: number, windowSec: number): Promise<Response | null> {
+  const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await (supabaseAdmin as any).rpc("mt5_rate_hit", { p_bucket: `${name}:${ip}`, p_max: max, p_window_sec: windowSec });
+  if (error || data !== true) return Response.json({ error: "rate_limited" }, { status: 429, headers: { "Retry-After": String(windowSec) } });
+  return null;
+}
