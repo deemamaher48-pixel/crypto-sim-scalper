@@ -412,6 +412,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      mt5_expire_commands: { Args: never; Returns: undefined }
       mt5_lease_commands: {
         Args: { p_lease_sec?: number; p_limit?: number }
         Returns: {
