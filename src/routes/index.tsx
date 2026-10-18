@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
-const PriceChart = lazy(() => import("@/components/PriceChart"));
+import TradingViewChart from "@/components/TradingViewChart";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -94,14 +94,10 @@ function Home() {
           </div>
 
           <div className="rounded-lg border bg-card p-2">
-            <Suspense fallback={<div className="h-[420px]" />}>
-              <PriceChart
-                klines={chartK}
-                emaFast={s.emaFast}
-                emaSlow={s.emaSlow}
-                levels={open ? { entry: open.entry, stop: open.stop, target: open.target, side: open.side } : null}
-              />
-            </Suspense>
+            <TradingViewChart
+              symbol={gold ? "OANDA:XAUUSD" : "BINANCE:BTCUSDT"}
+              interval={bot.sniper ? "1" : "5"}
+            />
           </div>
 
           <ScorePanel sig={bot.signal} />
