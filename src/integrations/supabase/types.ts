@@ -101,6 +101,69 @@ export type Database = {
         }
         Relationships: []
       }
+      mt5_commands: {
+        Row: {
+          action: string
+          comment: string | null
+          created_at: string
+          id: string
+          lot: number | null
+          result: Json | null
+          sl: number | null
+          status: string
+          symbol: string
+          ticket: number | null
+          tp: number | null
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          lot?: number | null
+          result?: Json | null
+          sl?: number | null
+          status?: string
+          symbol?: string
+          ticket?: number | null
+          tp?: number | null
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          lot?: number | null
+          result?: Json | null
+          sl?: number | null
+          status?: string
+          symbol?: string
+          ticket?: number | null
+          tp?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mt5_status: {
+        Row: {
+          id: number
+          payload: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          payload?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          payload?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       paper_services: {
         Row: {
           enabled: boolean
