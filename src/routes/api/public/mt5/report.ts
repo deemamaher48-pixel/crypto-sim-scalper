@@ -24,9 +24,11 @@ export const Route = createFileRoute("/api/public/mt5/report")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data, error } = await (supabaseAdmin as any).rpc("mt5_report_command", { p_id: r.command_id, p_success: r.success, p_result: r });
         if (error) return Response.json({ error: "report_failed" }, { status: 500 });
-        // Only leased, non-final commands accept a report; duplicates/unknown/expired are rejected.
-        if (data !== "ok") return Response.json({ ok: false, error: "not_leased_or_duplicate" }, { status: 409 });
-        return Response.json({ ok: true });
+        // Atomic under row lock: leased + lease/expiry not passed => saved. Identical repeat => already_reported.
+        if (data === "ok") return Response.json({ ok: true });
+        if (data === "already_reported") return Response.json({ ok: true, already_reported: true });
+        if (data === "conflict") return Response.json({ ok: false, error: "report_conflict" }, { status: 409 });
+        return Response.json({ ok: false, error: "not_leased_or_expired" }, { status: 409 });
       },
     },
   },
