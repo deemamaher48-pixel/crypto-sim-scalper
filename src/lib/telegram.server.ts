@@ -6,7 +6,7 @@ type Btn = { text: string; callback_data?: string; url?: string };
 type Kb = Btn[][];
 
 export async function tg(method: string, body: Record<string, unknown>) {
-  const L = process.env.LOVABLE_API_KEY, T = process.env.TELEGRAM_API_KEY;
+  const L = process.env['LOVABLE_API_KEY'], T = process.env['TELEGRAM_API_KEY'];
   if (!L || !T) throw new Error('Telegram not configured');
   const res = await fetch(`${GW}/${method}`, { method: 'POST', headers: { Authorization: `Bearer ${L}`, 'X-Connection-Api-Key': T, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await res.json().catch(() => ({}));

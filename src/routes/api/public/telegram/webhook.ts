@@ -8,7 +8,7 @@ export const Route = createFileRoute('/api/public/telegram/webhook')({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const key = process.env.TELEGRAM_API_KEY;
+        const key = process.env['TELEGRAM_API_KEY'];
         if (!key) return new Response('not configured', { status: 500 });
         const expected = createHash('sha256').update(`telegram-webhook:${key}`).digest('base64url');
         if (!eq(request.headers.get('X-Telegram-Bot-Api-Secret-Token') ?? '', expected)) return new Response('Unauthorized', { status: 401 });
