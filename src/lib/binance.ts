@@ -8,7 +8,7 @@ export const LIVE_WS = "wss://data-stream.binance.vision/ws";
 export type Kline = { time: number; open: number; high: number; low: number; close: number; volume: number };
 
 // Fallback hosts for live market data; tried in order with retry.
-export const LIVE_HOSTS = [LIVE_REST, "https://api.binance.com", "https://api1.binance.com", "https://api3.binance.com"];
+export const LIVE_HOSTS = [LIVE_REST, "https://api-gcp.binance.com", "https://api.binance.com", "https://api4.binance.com"];
 
 export async function fetchKlines(
   symbol: string,
@@ -19,13 +19,23 @@ export async function fetchKlines(
   const hosts = source === "live" ? LIVE_HOSTS : [TESTNET_REST];
   let rows: unknown[][] | null = null;
   let lastErr: unknown;
+  const get = (url: string) => fetch(url, { signal: AbortSignal.timeout(5000) });
   for (let attempt = 0; attempt < 2 && !rows; attempt++) {
     for (const base of hosts) {
       try {
-        const res = await fetch(`${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+        const res = await get(`${base}/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
         if (!res.ok) throw new Error(`تعذر جلب الشموع (${res.status})`);
         const data = (await res.json()) as unknown[][];
         if (Array.isArray(data) && data.length) { rows = data; break; }
+      } catch (e) { lastErr = e; }
+    }
+    // Last resort: OKX public candles (same pairs), newest-first → reversed.
+    if (!rows && source === "live") {
+      try {
+        const inst = symbol.replace(/USDT$/, "-USDT");
+        const res = await get(`https://www.okx.com/api/v5/market/candles?instId=${inst}&bar=${interval}&limit=${Math.min(limit, 300)}`);
+        const j = (await res.json()) as { data?: string[][] };
+        if (j.data?.length) rows = j.data.slice().reverse().map((r) => [r[0], r[1], r[2], r[3], r[4], r[5]]);
       } catch (e) { lastErr = e; }
     }
   }
