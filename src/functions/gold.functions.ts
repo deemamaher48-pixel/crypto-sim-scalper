@@ -12,7 +12,7 @@ export const getGoldKlines = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<{ rows: Kline[]; source: "xau" | "paxg" }> => {
     const hit = cache.get(data.interval);
     if (hit && Date.now() - hit.at < TTL) return { rows: hit.rows, source: "xau" };
-    const key = process.env.TWELVE_DATA_API_KEY;
+    const key = process.env["TWELVE_DATA_API_KEY"];
     const iv = MAP[data.interval];
     if (key && iv) {
       try {
