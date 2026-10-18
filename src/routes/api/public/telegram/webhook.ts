@@ -40,7 +40,7 @@ async function handle(u: any) {
       const { data: cur } = await db.from('tg_subscribers').select('expires_at').eq('chat_id', fromId).maybeSingle();
       const base = Math.max(Date.now(), cur ? Date.parse(cur.expires_at) : 0);
       const exp = new Date(base + k.days * 864e5).toISOString();
-      await db.from('tg_license_keys').update({ used_by: fromId, used_at: new Date().toISOString() }).eq('code', code);
+      await db.from('tg_license_keys').update({ used_by: fromId, used_at: new Date().toISOString() }).eq('code', code!);
       await db.from('tg_subscribers').upsert({ chat_id: fromId, expires_at: exp });
       return T.tg('sendMessage', { chat_id: chatId, text: `💎 تم تفعيل اشتراكك حتى ${exp.slice(0, 10)}` });
     }
