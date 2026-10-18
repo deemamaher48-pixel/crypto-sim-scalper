@@ -106,8 +106,11 @@ export type Database = {
           action: string
           comment: string | null
           created_at: string
+          expires_at: string
           id: string
+          lease_until: string | null
           lot: number | null
+          reported_at: string | null
           result: Json | null
           sl: number | null
           status: string
@@ -120,8 +123,11 @@ export type Database = {
           action: string
           comment?: string | null
           created_at?: string
+          expires_at?: string
           id?: string
+          lease_until?: string | null
           lot?: number | null
+          reported_at?: string | null
           result?: Json | null
           sl?: number | null
           status?: string
@@ -134,8 +140,11 @@ export type Database = {
           action?: string
           comment?: string | null
           created_at?: string
+          expires_at?: string
           id?: string
+          lease_until?: string | null
           lot?: number | null
+          reported_at?: string | null
           result?: Json | null
           sl?: number | null
           status?: string
@@ -143,6 +152,51 @@ export type Database = {
           ticket?: number | null
           tp?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      mt5_control: {
+        Row: {
+          allowed_symbols: string[]
+          emergency_stop: boolean
+          id: number
+          max_lot: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allowed_symbols?: string[]
+          emergency_stop?: boolean
+          id?: number
+          max_lot?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allowed_symbols?: string[]
+          emergency_stop?: boolean
+          id?: number
+          max_lot?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      mt5_rate_limits: {
+        Row: {
+          bucket: string
+          hits: number
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          hits: number
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          hits?: number
+          window_start?: string
         }
         Relationships: []
       }
@@ -314,6 +368,24 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -333,9 +405,38 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      mt5_lease_commands: {
+        Args: { p_lease_sec?: number; p_limit?: number }
+        Returns: {
+          action: string
+          comment: string
+          id: string
+          lot: number
+          sl: number
+          symbol: string
+          ticket: number
+          tp: number
+          ttl: number
+        }[]
+      }
+      mt5_rate_hit: {
+        Args: { p_bucket: string; p_max: number; p_window_sec: number }
+        Returns: boolean
+      }
+      mt5_report_command: {
+        Args: { p_id: string; p_result: Json; p_success: boolean }
+        Returns: string
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -462,6 +563,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
