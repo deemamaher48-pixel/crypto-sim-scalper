@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { LIVE_WS, fetchKlines, type Kline } from "@/lib/binance";
+import { getGoldKlines } from "@/functions/gold.functions";
 
 /** Real-time klines (REST history with fallback hosts + WebSocket that auto-reconnects silently). */
 export function useLiveKlines(symbol: string, interval: string) {
@@ -11,6 +12,19 @@ export function useLiveKlines(symbol: string, interval: string) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let tries = 0;
     setKlines([]);
+
+    // Gold: real XAU/USD spot via server (polled), no Binance socket.
+    if (symbol === "PAXGUSDT") {
+      const poll = async () => {
+        try {
+          const { rows } = await getGoldKlines({ data: { interval } });
+          if (alive) { setKlines(rows); setConnected(true); }
+        } catch { if (alive) setConnected(false); }
+        if (alive) timer = setTimeout(poll, 30000);
+      };
+      poll();
+      return () => { alive = false; clearTimeout(timer); };
+    }
 
     const load = async () => {
       try {
