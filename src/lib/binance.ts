@@ -8,7 +8,7 @@ export const LIVE_WS = "wss://data-stream.binance.vision/ws";
 export type Kline = { time: number; open: number; high: number; low: number; close: number; volume: number };
 
 // Fallback hosts for live market data; tried in order with retry.
-export const LIVE_HOSTS = [LIVE_REST, "https://api.binance.com", "https://api1.binance.com", "https://api3.binance.com"];
+export const LIVE_HOSTS = [LIVE_REST, "https://api-gcp.binance.com", "https://api.binance.com", "https://api4.binance.com"];
 
 export async function fetchKlines(
   symbol: string,
