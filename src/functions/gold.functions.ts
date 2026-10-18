@@ -20,12 +20,13 @@ export const getGoldKlines = createServerFn({ method: "GET" })
           `https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${iv}&outputsize=300&timezone=UTC&apikey=${key}`,
           { signal: AbortSignal.timeout(6000) },
         );
-        const j = (await res.json()) as { status?: string; values?: Record<string, string>[] };
+        type Row = { datetime: string; open: string; high: string; low: string; close: string; volume?: string };
+        const j = (await res.json()) as { status?: string; values?: Row[] };
         if (j.status === "ok" && j.values?.length) {
           const rows = j.values
             .map((v) => ({
-              time: Math.floor(Date.parse(String(v.datetime).replace(" ", "T") + "Z") / 1000),
-              open: +v.open!, high: +v.high!, low: +v.low!, close: +v.close!,
+              time: Math.floor(Date.parse(v.datetime.replace(" ", "T") + "Z") / 1000),
+              open: +v.open, high: +v.high, low: +v.low, close: +v.close,
               volume: Number(v.volume ?? 0) || 1,
             }))
             .reverse();
