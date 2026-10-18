@@ -23,9 +23,6 @@ export async function tickBackgroundUser(userId:string,manual?:'long'|'short'|'c
  try{const {notifyTradeChanges}=await import('@/lib/telegram.server');await notifyTradeChanges(userId,before,r.state);}catch(e){console.error('telegram notify',e);}
  return r;
 }
-async function _unusedTick(userId:string,manual?:'long'|'short'|'close'){
- return locked(userId,async s=>{const [bars,filter,news]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200),fetchNewsTimes()]);return stepPaper(s,bars,filter,Date.now(),manual,news);},true);
-}
 export const getBackground = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  const {data,error}=await context.supabase.from('paper_services').select('state,last_tick_at,last_message').eq('user_id',context.userId).maybeSingle();if(error)throw error;return data?{state:data.state as unknown as PaperState,lastTickAt:data.last_tick_at,message:data.last_message}:null;
 });
