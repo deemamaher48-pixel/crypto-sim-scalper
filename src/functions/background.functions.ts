@@ -19,7 +19,17 @@ async function locked(userId:string, change:(s:PaperState)=>Promise<{state:Paper
 }
 export async function tickBackgroundUser(userId:string,manual?:'long'|'short'|'close'){
  const before=new Map<string,{closed:boolean;tp1:boolean}>();
- const r=await locked(userId,async s=>{s.trades.slice(0,5).forEach(t=>before.set(t.id,{closed:!!t.closedAt,tp1:!!t.tp1Hit}));const [bars,filter,news]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200),fetchNewsTimes()]);return stepPaper(s,bars,filter,Date.now(),manual,news);},true);
+ const r=await locked(userId,async s=>{s.trades.slice(0,5).forEach(t=>before.set(t.id,{closed:!!t.closedAt,tp1:!!t.tp1Hit}));const [bars,filter,news]=await Promise.all([fetchKlines(s.symbol,s.sniper?'1m':'5m',300),fetchKlines(s.symbol,s.sniper?'5m':'15m',200),fetchNewsTimes()]);
+  const out=stepPaper(s,bars,filter,Date.now(),manual,news);
+  const nt=out.state.trades[0];
+  if(!manual && nt && !nt.closedAt && !s.trades.some(x=>x.id===nt.id)){
+   const {aiReviewTrade}=await import('@/lib/ai-analyst.server');
+   const v=await aiReviewTrade({symbol:s.symbol==='PAXGUSDT'?'XAUUSD':s.symbol,side:nt.side,price:nt.entry,stop:nt.stop,target:nt.target,signalReason:nt.entryReason,bars,filter,frame:s.sniper?'1m':'5m'});
+   if(!v.approve) return {state:{...s,lastCandle:out.state.lastCandle},message:`🧠 الذكاء الاصطناعي رفض الصفقة (ثقة ${v.confidence}%): ${v.reason}`};
+   nt.entryReason=`${nt.entryReason} | 🧠 AI ${v.confidence}%: ${v.reason}`;
+   out.message=`${out.message} — موافقة الذكاء الاصطناعي ${v.confidence}%`;
+  }
+  return out;},true);
  try{const {notifyTradeChanges}=await import('@/lib/telegram.server');await notifyTradeChanges(userId,before,r.state);}catch(e){console.error('telegram notify',e);}
  return r;
 }

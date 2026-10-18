@@ -20,3 +20,4 @@
 - A paper_services account is excluded from legacy bot ticks; permanent account trade history is never deleted by a balance reset — avoids competing engines and keeps absence records intact.
 - Shared PriceChart preserves the visible time range on price updates and separates drag-to-pan from explicit zoom controls — prevents live updates and gestures from unexpectedly changing zoom.
 - MT5 VPS bridge: the VPS polls /api/public/mt5/poll and posts /report with a bearer key; commands queue in server-only mt5_commands — the VPS pulls, so no inbound port is needed.
+- Background bot entries pass a Claude AI review (src/lib/ai-analyst.server.ts) after the indicator signal; it fails closed so AI errors never open trades — indicators find setups, AI vetoes weak ones.
