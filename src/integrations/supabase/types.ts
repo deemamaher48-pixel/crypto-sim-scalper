@@ -131,6 +131,69 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_admins: {
+        Row: {
+          chat_id: number
+          created_at: string
+          panel_message_id: number | null
+          user_id: string
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          panel_message_id?: number | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          panel_message_id?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tg_license_keys: {
+        Row: {
+          code: string
+          created_at: string
+          days: number
+          used_at: string | null
+          used_by: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          days: number
+          used_at?: string | null
+          used_by?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          days?: number
+          used_at?: string | null
+          used_by?: number | null
+        }
+        Relationships: []
+      }
+      tg_subscribers: {
+        Row: {
+          chat_id: number
+          created_at: string
+          expires_at: string
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          expires_at: string
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          expires_at?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           closed_at: string | null
