@@ -19,3 +19,4 @@
 - Home uses the local paper engine only for guests; authenticated home uses durable paper_services state and the shared background-paper pure engine, with leased transactional state/history commits — closed tabs cannot stop trading or double-book balances.
 - A paper_services account is excluded from legacy bot ticks; permanent account trade history is never deleted by a balance reset — avoids competing engines and keeps absence records intact.
 - Shared PriceChart preserves the visible time range on price updates and separates drag-to-pan from explicit zoom controls — prevents live updates and gestures from unexpectedly changing zoom.
+- MT5 VPS bridge: the VPS polls /api/public/mt5/poll and posts /report with a bearer key; commands queue in server-only mt5_commands — the VPS pulls, so no inbound port is needed.
