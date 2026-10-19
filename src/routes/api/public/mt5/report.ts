@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { rateLimit, verifyBridge } from "@/lib/mt5-bridge.server";
+import { rateLimit, verifyBridge, withRequestLog } from "@/lib/mt5-bridge.server";
 
 const Body = z.object({
   command_id: z.string().uuid(),
@@ -13,7 +13,7 @@ const Body = z.object({
 export const Route = createFileRoute("/api/public/mt5/report")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
+      POST: ({ request }) => withRequestLog("report", request, async () => {
         const limited = await rateLimit(request, "report", 120, 60);
         if (limited) return limited;
         const denied = await verifyBridge(request);
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/public/mt5/report")({
         if (data === "already_reported") return Response.json({ ok: true, already_reported: true });
         if (data === "conflict") return Response.json({ ok: false, error: "report_conflict" }, { status: 409 });
         return Response.json({ ok: false, error: "not_leased_or_expired" }, { status: 409 });
-      },
+      }),
     },
   },
 });
