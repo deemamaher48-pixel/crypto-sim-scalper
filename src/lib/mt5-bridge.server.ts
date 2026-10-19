@@ -1,4 +1,20 @@
 // Shared helpers for the MT5 VPS bridge endpoints (server-only).
+
+/** Safe per-request log: timestamp, duration, status, X-Request-ID. Never logs keys or bodies. */
+export async function withRequestLog(endpoint: string, request: Request, fn: () => Promise<Response>): Promise<Response> {
+  const arrived = new Date();
+  const t0 = Date.now();
+  const raw = request.headers.get("x-request-id") ?? "";
+  const request_id = /^[A-Za-z0-9._-]{1,64}$/.test(raw) ? raw : raw ? "invalid" : null;
+  let status = 500;
+  try {
+    const res = await fn();
+    status = res.status;
+    return res;
+  } finally {
+    console.log(JSON.stringify({ mt5_req: endpoint, arrived_at: arrived.toISOString(), duration_ms: Date.now() - t0, status, request_id }));
+  }
+}
 async function sha(s: string) {
   return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)));
 }

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { bridgeDb, rateLimit, verifyBridge } from "@/lib/mt5-bridge.server";
+import { bridgeDb, rateLimit, verifyBridge, withRequestLog } from "@/lib/mt5-bridge.server";
 
 const Body = z.object({
   connected: z.boolean().optional(),
@@ -33,5 +33,5 @@ async function handle(request: Request) {
 }
 
 export const Route = createFileRoute("/api/public/mt5/poll")({
-  server: { handlers: { POST: ({ request }) => handle(request) } },
+  server: { handlers: { POST: ({ request }) => withRequestLog("poll", request, () => handle(request)) } },
 });
