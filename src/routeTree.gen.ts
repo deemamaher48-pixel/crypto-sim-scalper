@@ -17,8 +17,10 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedTradesRouteImport } from './routes/_authenticated/trades'
 import { Route as ApiPublicJobsBotTickRouteImport } from './routes/api/public/jobs/bot-tick'
 import { Route as ApiPublicMt5AuthCheckRouteImport } from './routes/api/public/mt5/auth-check'
+import { Route as ApiPublicMt5PendingRouteImport } from './routes/api/public/mt5/pending'
 import { Route as ApiPublicMt5PollRouteImport } from './routes/api/public/mt5/poll'
 import { Route as ApiPublicMt5ReportRouteImport } from './routes/api/public/mt5/report'
+import { Route as ApiPublicMt5ResultRouteImport } from './routes/api/public/mt5/result'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -60,6 +62,11 @@ const ApiPublicMt5AuthCheckRoute = ApiPublicMt5AuthCheckRouteImport.update({
   path: '/api/public/mt5/auth-check',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMt5PendingRoute = ApiPublicMt5PendingRouteImport.update({
+  id: '/api/public/mt5/pending',
+  path: '/api/public/mt5/pending',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicMt5PollRoute = ApiPublicMt5PollRouteImport.update({
   id: '/api/public/mt5/poll',
   path: '/api/public/mt5/poll',
@@ -68,6 +75,11 @@ const ApiPublicMt5PollRoute = ApiPublicMt5PollRouteImport.update({
 const ApiPublicMt5ReportRoute = ApiPublicMt5ReportRouteImport.update({
   id: '/api/public/mt5/report',
   path: '/api/public/mt5/report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicMt5ResultRoute = ApiPublicMt5ResultRouteImport.update({
+  id: '/api/public/mt5/result',
+  path: '/api/public/mt5/result',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTelegramWebhookRoute =
@@ -85,8 +97,10 @@ export interface FileRoutesByFullPath {
   '/trades': typeof AuthenticatedTradesRoute
   '/api/public/jobs/bot-tick': typeof ApiPublicJobsBotTickRoute
   '/api/public/mt5/auth-check': typeof ApiPublicMt5AuthCheckRoute
+  '/api/public/mt5/pending': typeof ApiPublicMt5PendingRoute
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
   '/api/public/mt5/report': typeof ApiPublicMt5ReportRoute
+  '/api/public/mt5/result': typeof ApiPublicMt5ResultRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -97,8 +111,10 @@ export interface FileRoutesByTo {
   '/trades': typeof AuthenticatedTradesRoute
   '/api/public/jobs/bot-tick': typeof ApiPublicJobsBotTickRoute
   '/api/public/mt5/auth-check': typeof ApiPublicMt5AuthCheckRoute
+  '/api/public/mt5/pending': typeof ApiPublicMt5PendingRoute
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
   '/api/public/mt5/report': typeof ApiPublicMt5ReportRoute
+  '/api/public/mt5/result': typeof ApiPublicMt5ResultRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -111,8 +127,10 @@ export interface FileRoutesById {
   '/_authenticated/trades': typeof AuthenticatedTradesRoute
   '/api/public/jobs/bot-tick': typeof ApiPublicJobsBotTickRoute
   '/api/public/mt5/auth-check': typeof ApiPublicMt5AuthCheckRoute
+  '/api/public/mt5/pending': typeof ApiPublicMt5PendingRoute
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
   '/api/public/mt5/report': typeof ApiPublicMt5ReportRoute
+  '/api/public/mt5/result': typeof ApiPublicMt5ResultRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -125,8 +143,10 @@ export interface FileRouteTypes {
     | '/trades'
     | '/api/public/jobs/bot-tick'
     | '/api/public/mt5/auth-check'
+    | '/api/public/mt5/pending'
     | '/api/public/mt5/poll'
     | '/api/public/mt5/report'
+    | '/api/public/mt5/result'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -137,8 +157,10 @@ export interface FileRouteTypes {
     | '/trades'
     | '/api/public/jobs/bot-tick'
     | '/api/public/mt5/auth-check'
+    | '/api/public/mt5/pending'
     | '/api/public/mt5/poll'
     | '/api/public/mt5/report'
+    | '/api/public/mt5/result'
     | '/api/public/telegram/webhook'
   id:
     | '__root__'
@@ -150,8 +172,10 @@ export interface FileRouteTypes {
     | '/_authenticated/trades'
     | '/api/public/jobs/bot-tick'
     | '/api/public/mt5/auth-check'
+    | '/api/public/mt5/pending'
     | '/api/public/mt5/poll'
     | '/api/public/mt5/report'
+    | '/api/public/mt5/result'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -161,8 +185,10 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ApiPublicJobsBotTickRoute: typeof ApiPublicJobsBotTickRoute
   ApiPublicMt5AuthCheckRoute: typeof ApiPublicMt5AuthCheckRoute
+  ApiPublicMt5PendingRoute: typeof ApiPublicMt5PendingRoute
   ApiPublicMt5PollRoute: typeof ApiPublicMt5PollRoute
   ApiPublicMt5ReportRoute: typeof ApiPublicMt5ReportRoute
+  ApiPublicMt5ResultRoute: typeof ApiPublicMt5ResultRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
@@ -224,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMt5AuthCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/mt5/pending': {
+      id: '/api/public/mt5/pending'
+      path: '/api/public/mt5/pending'
+      fullPath: '/api/public/mt5/pending'
+      preLoaderRoute: typeof ApiPublicMt5PendingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/mt5/poll': {
       id: '/api/public/mt5/poll'
       path: '/api/public/mt5/poll'
@@ -236,6 +269,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/mt5/report'
       fullPath: '/api/public/mt5/report'
       preLoaderRoute: typeof ApiPublicMt5ReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/mt5/result': {
+      id: '/api/public/mt5/result'
+      path: '/api/public/mt5/result'
+      fullPath: '/api/public/mt5/result'
+      preLoaderRoute: typeof ApiPublicMt5ResultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/telegram/webhook': {
@@ -269,8 +309,10 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ApiPublicJobsBotTickRoute: ApiPublicJobsBotTickRoute,
   ApiPublicMt5AuthCheckRoute: ApiPublicMt5AuthCheckRoute,
+  ApiPublicMt5PendingRoute: ApiPublicMt5PendingRoute,
   ApiPublicMt5PollRoute: ApiPublicMt5PollRoute,
   ApiPublicMt5ReportRoute: ApiPublicMt5ReportRoute,
+  ApiPublicMt5ResultRoute: ApiPublicMt5ResultRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
