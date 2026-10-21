@@ -42,6 +42,30 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
   return out;
 }
 
+// Verify executed protective commands against the broker snapshot (truth), then announce once.
+export async function verifyProtective(db: any, positions: MgrPos[]) {
+  const since = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { data: cmds } = await db.from("mt5_commands").select("id,action,ticket,result,reported_at")
+    .in("action", ["CLOSE", "BREAKEVEN", "CLOSE_PARTIAL"]).eq("status", "executed").gte("reported_at", since).limit(20);
+  for (const c of cmds ?? []) {
+    if (c.result?.verified !== undefined) continue;
+    if (Date.now() - Date.parse(c.reported_at) < 12_000) continue; // let the snapshot catch up
+    const mine = c.ticket ? positions.filter(p => p.ticket === c.ticket) : positions;
+    let ok: boolean;
+    if (c.action === "CLOSE") ok = mine.length === 0;
+    else if (c.action === "BREAKEVEN") ok = mine.length === 0 || mine.every(p => p.type === "BUY" ? p.sl > p.price_open : p.sl > 0 && p.sl < p.price_open);
+    else ok = true;
+    // Claim the row first so a second loop can't announce it twice.
+    const { data: claimed } = await db.from("mt5_commands").update({ result: { ...c.result, verified: ok }, ...(ok ? {} : { status: "failed" }) })
+      .eq("id", c.id).eq("status", "executed").select("id");
+    if (!claimed?.length) continue;
+    const name = c.action === "CLOSE" ? "الإغلاق" : c.action === "BREAKEVEN" ? "التأمين" : "الإغلاق الجزئي";
+    const t = c.ticket || "كل الصفقات";
+    const msg = ok ? `✅ تأكد ${name} فعليًا على MT5\n🎫 ${t}` : `⚠️ MT5 ردّ بالنجاح بس ${name} ما صار فعليًا\n🎫 ${t}\nرح يعيد النظام المحاولة تلقائيًا`;
+    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(msg); } catch (e) { console.error("notify", e); }
+  }
+}
+
 // Fast tracking: re-check open positions every ~10s for most of the minute between cron ticks.
 export async function trackLoop(db: any, budgetMs = 45_000) {
   const end = Date.now() + budgetMs;
@@ -49,7 +73,9 @@ export async function trackLoop(db: any, budgetMs = 45_000) {
     await new Promise(r => setTimeout(r, 10_000));
     const { data: st } = await db.from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle();
     const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 30_000;
-    const pos = fresh && Array.isArray(st.payload?.positions) ? st.payload.positions : [];
+    if (!fresh) continue;
+    const pos = Array.isArray(st.payload?.positions) ? st.payload.positions : [];
+    try { await verifyProtective(db, pos); } catch (e) { console.error("verify", e); }
     if (pos.length) { try { await manageOpenPositions(db, pos); } catch (e) { console.error("track", e); } }
   }
 }
