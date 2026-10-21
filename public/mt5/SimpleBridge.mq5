@@ -1,4 +1,4 @@
-// SimpleBridge v3 (momentum TP extension): reads Common/Files/cmd_*.txt, trades, writes res_<id>.txt and snapshot.json. Demo only.
+// SimpleBridge v4 (momentum TP extension): reads Common/Files/cmd_*.txt, trades, writes res_<id>.txt and snapshot.json. Demo only.
 // - SL/TP re-anchored on the broker's real fill price when sl_pts/tp_pts are given.
 // - CLOSE / BREAKEVEN with ticket=0 apply to every position on the symbol.
 // - One position at a time: a new entry while one is open replies "already_open".
@@ -9,10 +9,11 @@ input double MaxLot = 0.10;
 input double BeLockPts = 0.5;     // break-even locks this profit (price units)
 input double TrailStartPts = 3.0; // start trailing after this move
 input double TrailDistPts = 1.5;  // trail distance behind price
-input double MaxSpreadPts = 0.6;  // skip new entries when spread is wider
+input double MaxSpreadPts = 0.4;  // skip new entries when spread is wider
 input double ExtendAtFrac = 0.8;  // momentum TP extension: trigger at 80% of target
 input double ExtendLockFrac = 0.7;// on extension, SL locks 70% of current profit
 input int    MaxExtends = 2;      // at most 2 extensions per position
+input double ExtTrailDistPts = 2.2; // wider trail once the target was extended
 
 ulong extTk[]; int extN[];
 int ExtCount(ulong tk) { for (int i = 0; i < ArraySize(extTk); i++) if (extTk[i] == tk) return extN[i]; return 0; }
@@ -73,7 +74,8 @@ void Trail() {
       double mv = b ? px - o : o - px;
       ExtendTP(tk, sy, b, o, px, mv);
       if (!PositionSelectByTicket(tk)) continue;
-      if (mv >= TrailStartPts) SafeSL(tk, b ? px - TrailDistPts : px + TrailDistPts);
+      double td = ExtCount(tk) > 0 ? ExtTrailDistPts : TrailDistPts;
+      if (mv >= TrailStartPts) SafeSL(tk, b ? px - td : px + td);
    }
 }
 datetime lastSnap = 0;

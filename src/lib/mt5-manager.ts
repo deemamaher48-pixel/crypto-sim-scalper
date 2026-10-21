@@ -5,16 +5,20 @@ import { ema, rsi } from "@/lib/trading";
 export type MgrPos = { ticket: number; type: "BUY" | "SELL"; volume: number; price_open: number; sl: number; tp: number; profit: number };
 export type MgrBar = { open: number; high: number; low: number; close: number };
 export type MgrDecision = { action: "hold" | "BREAKEVEN" | "CLOSE_PARTIAL" | "CLOSE"; reason: string; lot?: number };
-export const MGR = { bePts: 2.5, graceSec: 120, stallFrac: 0.35, stallMaxPts: 0.4, partialPts: 2.0, exitMinPts: 1.5, lossCutFrac: 0.7, pointValuePerLot: 100 };
+export const MGR = { bePts: 2.5, graceSec: 60, stallFrac: 0.35, stallMaxPts: 0.4, partialPts: 2.0, exitMinPts: 1.5, lossCutFrac: 0.7, pointValuePerLot: 100 };
 
 export function movePts(p: MgrPos) {
   return p.volume > 0 ? p.profit / (p.volume * MGR.pointValuePerLot) : 0;
 }
 
 export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean, ageSec = Infinity): MgrDecision {
-  // Grace period: the broker hard SL protects the trade; no smart exits while it breathes.
-  if (ageSec < MGR.graceSec) return { action: "hold", reason: "grace" };
   const long = p.type === "BUY";
+  // Grace period (60s): only exception is a closed bar through EMA21 against us.
+  if (ageSec < MGR.graceSec) {
+    const cl = bars.map(b => b.close), m = cl.length - 1, e = ema(cl, 21)[m];
+    if (m >= 22 && Number.isFinite(e) && (long ? cl[m]! < e! : cl[m]! > e!) && movePts(p) < 0) return { action: "CLOSE", reason: "ema21_break_grace" };
+    return { action: "hold", reason: "grace" };
+  }
   const move = movePts(p);
   const slDist = p.sl > 0 ? Math.abs(p.price_open - p.sl) : 0;
   const secured = p.sl > 0 && (long ? p.sl >= p.price_open : p.sl <= p.price_open);
@@ -46,7 +50,8 @@ export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean, 
     const cooling = long ? r[n]! < r[n - 1]! && r[n]! < 60 : r[n]! > r[n - 1]! && r[n]! > 40;
     if (stall || flip || (cooling && against)) return { action: "CLOSE", reason: "tp_weak_take" };
   }
-  if (!partialDone && move >= MGR.partialPts && p.volume >= 0.02) return { action: "CLOSE_PARTIAL", reason: "take_half", lot: +(Math.floor(p.volume * 50) / 100).toFixed(2) };
+  // Partial close (50%) at 80% of target on 0.02+ lots, so the rest can ride the momentum extension.
+  if (!partialDone && tpDist > 0 && move >= 0.8 * tpDist && p.volume >= 0.02) return { action: "CLOSE_PARTIAL", reason: "take_half", lot: +(Math.floor(p.volume * 50) / 100).toFixed(2) };
   if (!secured && move >= MGR.bePts) return { action: "BREAKEVEN", reason: "secure_entry" };
   return { action: "hold", reason: "ok" };
 }

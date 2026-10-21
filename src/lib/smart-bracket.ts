@@ -4,7 +4,7 @@
 import { type Side } from "@/lib/trading";
 import type { Bar } from "@/lib/smart-scalp";
 
-export const SMART = { minSl: 0.5, minTp: 1.2, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 1.3, minLevelDist: 0.8 } as const;
+export const SMART = { minSl: 1.5, minTp: 2.5, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 1.3, minLevelDist: 0.8 } as const;
 
 export type SmartBracket =
   | { ok: true; stop: number; target: number; slPts: number; tpPts: number; why: string }
@@ -30,7 +30,7 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
   const ext = long ? Math.min(...swing.map((b) => b.low)) : Math.max(...swing.map((b) => b.high));
   const swingDist = long ? entry - ext : ext - entry;
   let sl = Math.max(swingDist + SMART.buffer, a * 0.5, SMART.minSl);
-  if (sl > maxSl) sl = maxSl; // cap at the user's max
+  if (sl > Math.max(maxSl, SMART.minSl)) sl = Math.max(maxSl, SMART.minSl); // cap at the user's max
 
   // Only real swing pivots count as levels; tiny wicks right next to entry are ignored.
   const win = bars.slice(-SMART.levelBars);
@@ -41,7 +41,7 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
   // Adaptive target: in a trend (last 10 bars moved ≥ 3×ATR our way) aim for the user max; when calm, ~2.5×ATR (min 2 pts).
   const trendMove = (bars[bars.length - 1]!.close - bars[bars.length - 11]!.close) * d;
   const trending = a > 0 && trendMove >= 3 * a;
-  let tp = trending ? maxTp : Math.min(maxTp, Math.max(2, a * 2.5));
+  let tp = trending ? maxTp : Math.min(maxTp, Math.max(SMART.minTp, a * 2.5));
   let why = `وقف تحت ${long ? "القاع" : "القمة"} القريب | ${trending ? "ترند — هدف كامل" : "سوق هادي — هدف قريب"}`;
   if (levels.length) {
     const near = long ? Math.min(...levels) : Math.max(...levels);
@@ -52,7 +52,7 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
   // Poor reward: tighten the stop (never below the ATR floor) before giving up on the trade.
   if (tp >= SMART.minTp && tp < r2(sl * SMART.minRR)) {
     const tight = r2(tp / SMART.minRR);
-    if (tight >= Math.max(SMART.minSl, r2(a * 0.4))) { sl = tight; why += " | وقف مضغوط"; }
+    if (tight >= SMART.minSl) { sl = tight; why += " | وقف مضغوط"; }
   }
   if (tp < SMART.minTp || tp < r2(sl * SMART.minRR)) return { ok: false, why: `${long ? "مقاومة" : "دعم"} قريب جداً — عائد ضعيف` };
   return { ok: true, stop: r2(entry - d * sl), target: r2(entry + d * tp), slPts: sl, tpPts: tp, why };
