@@ -4,7 +4,7 @@
 import { type Side } from "@/lib/trading";
 import type { Bar } from "@/lib/smart-scalp";
 
-export const SMART = { minSl: 0.5, minTp: 1.5, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 1.5 } as const;
+export const SMART = { minSl: 0.5, minTp: 1.2, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 1.3, minLevelDist: 0.8 } as const;
 
 export type SmartBracket =
   | { ok: true; stop: number; target: number; slPts: number; tpPts: number; why: string }
@@ -32,7 +32,12 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
   let sl = Math.max(swingDist + SMART.buffer, a * 0.5, SMART.minSl);
   if (sl > maxSl) sl = maxSl; // cap at the user's max
 
-  const levels = bars.slice(-SMART.levelBars).map((b) => (long ? b.high : b.low)).filter((x) => (long ? x > entry : x < entry));
+  // Only real swing pivots count as levels; tiny wicks right next to entry are ignored.
+  const win = bars.slice(-SMART.levelBars);
+  const levels = win
+    .filter((b, i) => i > 0 && i < win.length - 1 && (long ? b.high >= win[i - 1]!.high && b.high >= win[i + 1]!.high : b.low <= win[i - 1]!.low && b.low <= win[i + 1]!.low))
+    .map((b) => (long ? b.high : b.low))
+    .filter((x) => (long ? x - entry : entry - x) >= SMART.minLevelDist);
   let tp = maxTp, why = `وقف تحت ${long ? "القاع" : "القمة"} القريب`;
   if (levels.length) {
     const near = long ? Math.min(...levels) : Math.max(...levels);
@@ -40,7 +45,11 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
     if (dist < tp) { tp = dist; why += ` | هدف قبل ${long ? "مقاومة" : "دعم"} ${near.toFixed(2)}`; }
   }
   tp = r2(tp); sl = r2(sl);
+  // Poor reward: tighten the stop (never below the ATR floor) before giving up on the trade.
+  if (tp >= SMART.minTp && tp < r2(sl * SMART.minRR)) {
+    const tight = r2(tp / SMART.minRR);
+    if (tight >= Math.max(SMART.minSl, r2(a * 0.4))) { sl = tight; why += " | وقف مضغوط"; }
+  }
   if (tp < SMART.minTp || tp < r2(sl * SMART.minRR)) return { ok: false, why: `${long ? "مقاومة" : "دعم"} قريب جداً — عائد ضعيف` };
-  sl = r2(sl); tp = r2(tp);
   return { ok: true, stop: r2(entry - d * sl), target: r2(entry + d * tp), slPts: sl, tpPts: tp, why };
 }

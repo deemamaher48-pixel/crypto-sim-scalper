@@ -3,7 +3,7 @@
 import { ema, rsi, type Side } from "@/lib/trading";
 import type { Bar } from "@/lib/smart-scalp";
 
-export const TURBO = { minBody: 0.2, points: 2.5, slMult: 1.1, longRsi: [42, 76], shortRsi: [24, 58] } as const;
+export const TURBO = { minBody: 0.15, points: 2.5, slMult: 1.1, longRsi: [42, 76], shortRsi: [24, 58] } as const;
 
 export type TurboSignal = { side: Side | null; reason: string; rsi: number };
 
@@ -30,13 +30,13 @@ export function turboBracket(side: Side, entry: number) {
   return { stop: entry - d * TURBO.points * TURBO.slMult, target: entry + d * TURBO.points };
 }
 
-/** Anti-chasing: blocks entries after an extended run (4 same-color bars, or close stretched > 1.5× avg range from EMA9). */
+/** Anti-chasing: blocks entries after an extended run (5 same-color bars, or close stretched > 2× avg range from EMA9). */
 export function chaseBlock(c1: Bar[], e9: number): Side | null {
   const n = c1.length - 1;
-  const last = c1.slice(n - 3);
+  const last = c1.slice(n - 4);
   const avgRange = c1.slice(n - 13).reduce((a, k) => a + (k.high - k.low), 0) / 14;
   const stretch = avgRange > 0 ? (c1[n]!.close - e9) / avgRange : 0;
-  if (last.every((k) => k.close > k.open) || stretch > 1.5) return "long";
-  if (last.every((k) => k.close < k.open) || stretch < -1.5) return "short";
+  if (last.every((k) => k.close > k.open) || stretch > 2.0) return "long";
+  if (last.every((k) => k.close < k.open) || stretch < -2.0) return "short";
   return null;
 }
