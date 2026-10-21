@@ -10,7 +10,7 @@ export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, symbo
 
 export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-  const { data: ctl } = await db.from("mt5_control").select("emergency_stop,strategy").eq("id", 1).maybeSingle();
+  const { data: ctl } = await (db as any).from("mt5_control").select("emergency_stop,strategy").eq("id", 1).maybeSingle();
   if (!ctl || ctl.emergency_stop) return { action: "idle", reason: "emergency_stop" };
   const strategy = (ctl as { strategy?: string }).strategy ?? AUTO.strategy;
   if (inRolloverWindow(Date.now())) return { action: "idle", reason: "rollover" };
