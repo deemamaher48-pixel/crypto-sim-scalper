@@ -29,7 +29,8 @@ export const Route = createFileRoute("/api/public/mt5/pending")({
             sl_pts: p.sl_pts, tp_pts: p.tp_pts,
             ticket: c.ticket ?? 0, comment: p.comment, expires_at: c.expires_at,
           };
-        });
+        // Protective actions (close / break-even / partial) go before new entries.
+        }).sort((a: any, b: any) => Number(a.action === "BUY" || a.action === "SELL") - Number(b.action === "BUY" || b.action === "SELL"));
         return Response.json({ server_time: now, emergency_stop, commands });
       }),
     },
