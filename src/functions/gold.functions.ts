@@ -9,7 +9,9 @@ const MAP: Record<string, string> = { "1m": "1min", "5m": "5min", "15m": "15min"
 
 export const getGoldKlines = createServerFn({ method: "GET" })
   .inputValidator((d) => z.object({ interval: z.string() }).parse(d))
-  .handler(async ({ data }): Promise<{ rows: Kline[]; source: "xau" | "paxg" }> => {
+  .handler(({ data }) => loadGoldKlines(data));
+
+export async function loadGoldKlines(data: { interval: string }): Promise<{ rows: Kline[]; source: "xau" | "paxg" }> {
     const hit = cache.get(data.interval);
     if (hit && Date.now() - hit.at < TTL) return { rows: hit.rows, source: "xau" };
     const key = process.env["TWELVE_DATA_API_KEY"];
@@ -37,4 +39,4 @@ export const getGoldKlines = createServerFn({ method: "GET" })
     }
     if (hit) return { rows: hit.rows, source: "xau" };
     return { rows: await fetchKlines("PAXGUSDT", data.interval, 300), source: "paxg" };
-  });
+}
