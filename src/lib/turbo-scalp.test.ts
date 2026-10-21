@@ -15,3 +15,10 @@ describe("turbo scalp", () => {
     expect(turboSignal(bars)?.side).toBe("long");
   });
 });
+
+import { chaseBlock as _cb } from "./turbo-scalp";
+import { it as _it, expect as _ex } from "vitest";
+_it("blocks buying after 4 green candles in a row", () => {
+  const bars = Array.from({ length: 20 }, (_, i) => ({ time: i, open: 100 + i, close: 100.5 + i, high: 101 + i, low: 99.8 + i }));
+  _ex(_cb(bars as never, 119)).toBe("long");
+});

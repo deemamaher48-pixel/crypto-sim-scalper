@@ -17,14 +17,26 @@ export function turboSignal(c1: Bar[]): TurboSignal | null {
   const range = bar.high - bar.low;
   const body = range > 0 ? Math.abs(bar.close - bar.open) / range : 0;
   if (body < TURBO.minBody) return { side: null, rsi: r, reason: "شمعة دوجي بدون حركة" };
+  const chase = chaseBlock(c1, e9);
   if (bar.close > bar.open && (bar.close >= e9 || bar.close > prev.high) && r >= TURBO.longRsi[0] && r <= TURBO.longRsi[1])
-    return { side: "long", rsi: r, reason: `تيربو شراء | RSI ${r.toFixed(1)}` };
+    return chase === "long" ? { side: null, rsi: r, reason: "منع شراء بالقمة — صعود متمدد، ننتظر تصحيح" } : { side: "long", rsi: r, reason: `تيربو شراء | RSI ${r.toFixed(1)}` };
   if (bar.close < bar.open && (bar.close <= e9 || bar.close < prev.low) && r >= TURBO.shortRsi[0] && r <= TURBO.shortRsi[1])
-    return { side: "short", rsi: r, reason: `تيربو بيع | RSI ${r.toFixed(1)}` };
+    return chase === "short" ? { side: null, rsi: r, reason: "منع بيع بالقاع — هبوط متمدد، ننتظر تصحيح" } : { side: "short", rsi: r, reason: `تيربو بيع | RSI ${r.toFixed(1)}` };
   return { side: null, rsi: r, reason: `مراقبة التذبذب (RSI ${r.toFixed(1)})` };
 }
 
 export function turboBracket(side: Side, entry: number) {
   const d = side === "long" ? 1 : -1;
   return { stop: entry - d * TURBO.points * TURBO.slMult, target: entry + d * TURBO.points };
+}
+
+/** Anti-chasing: blocks entries after an extended run (4 same-color bars, or close stretched > 1.5× avg range from EMA9). */
+export function chaseBlock(c1: Bar[], e9: number): Side | null {
+  const n = c1.length - 1;
+  const last = c1.slice(n - 3);
+  const avgRange = c1.slice(n - 13).reduce((a, k) => a + (k.high - k.low), 0) / 14;
+  const stretch = avgRange > 0 ? (c1[n]!.close - e9) / avgRange : 0;
+  if (last.every((k) => k.close > k.open) || stretch > 1.5) return "long";
+  if (last.every((k) => k.close < k.open) || stretch < -1.5) return "short";
+  return null;
 }
