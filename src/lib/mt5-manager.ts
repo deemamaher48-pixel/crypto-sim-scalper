@@ -23,7 +23,7 @@ export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean):
   if (n >= 22 && last) {
     const range = last.high - last.low, body = Math.abs(last.close - last.open);
     const strongOpp = range > 0 && body / range >= 0.6 && (long ? last.close < last.open : last.close > last.open);
-    const exhausted = long ? r[n]! >= 75 : r[n]! <= 25;
+    const exhausted = long ? r[n - 1]! >= 75 : r[n - 1]! <= 25;
     against = long ? e9[n]! < e21[n]! : e9[n]! > e21[n]!;
     reversal = strongOpp && (exhausted || against);
   }
