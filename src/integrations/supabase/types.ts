@@ -161,6 +161,7 @@ export type Database = {
           emergency_stop: boolean
           id: number
           max_lot: number
+          strategy: string
           updated_at: string
           updated_by: string | null
         }
@@ -169,6 +170,7 @@ export type Database = {
           emergency_stop?: boolean
           id?: number
           max_lot?: number
+          strategy?: string
           updated_at?: string
           updated_by?: string | null
         }
@@ -177,6 +179,7 @@ export type Database = {
           emergency_stop?: boolean
           id?: number
           max_lot?: number
+          strategy?: string
           updated_at?: string
           updated_by?: string | null
         }
