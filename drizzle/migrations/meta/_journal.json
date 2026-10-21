@@ -64,6 +64,13 @@
       "when": 1792358129107,
       "tag": "0008_mt5_no_redelivery_report_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792582014695,
+      "tag": "0009_mt5_control_risk",
+      "breakpoints": true
     }
   ]
 }
