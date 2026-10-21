@@ -38,6 +38,12 @@ export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean):
   if (slDist > 0 && move <= -MGR.lossCutFrac * slDist && against) return { action: "CLOSE", reason: "trend_flipped_cut_loss" };
   if (move < 0 && flip) return { action: "CLOSE", reason: "momentum_flip_cut" };
   if (stall && move >= -0.2 && move <= MGR.stallMaxPts) return { action: "CLOSE", reason: "stall_exit" };
+  // Smart TP: close to target but momentum fading (stall, flip or RSI cooling) → take profit now.
+  const tpDist = p.tp > 0 ? Math.abs(p.tp - p.price_open) : 0;
+  if (tpDist > 0 && n >= 22 && move >= 0.6 * tpDist) {
+    const cooling = long ? r[n]! < r[n - 1]! && r[n]! < 60 : r[n]! > r[n - 1]! && r[n]! > 40;
+    if (stall || flip || (cooling && against)) return { action: "CLOSE", reason: "tp_weak_take" };
+  }
   if (!partialDone && move >= MGR.partialPts && p.volume >= 0.02) return { action: "CLOSE_PARTIAL", reason: "take_half", lot: +(Math.floor(p.volume * 50) / 100).toFixed(2) };
   if (!secured && move >= MGR.bePts) return { action: "BREAKEVEN", reason: "secure_entry" };
   return { action: "hold", reason: "ok" };
