@@ -39,4 +39,4 @@ export async function loadGoldKlines(data: { interval: string }): Promise<{ rows
     }
     if (hit) return { rows: hit.rows, source: "xau" };
     return { rows: await fetchKlines("PAXGUSDT", data.interval, 300), source: "paxg" };
-  });
+}
