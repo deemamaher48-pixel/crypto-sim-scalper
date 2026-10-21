@@ -20,7 +20,8 @@ export const Route = createFileRoute("/api/public/jobs/bot-tick")({
         const managed = new Set((services ?? []).map(s => s.user_id));
         const users = [...new Set([...(enabled ?? []), ...(open ?? [])].map((r) => r.user_id))].filter(u => !managed.has(u));
         const active = (services ?? []).filter(s => s.enabled || (s.state as { trades?: { closedAt?: string }[] }).trades?.some(t => !t.closedAt));
-        const tasks = [...users.map(u => () => tickUser(u)), ...active.map(s => () => tickBackgroundUser(s.user_id))];
+        const { mt5AutoTick } = await import("@/lib/mt5-autobot.server");
+        const tasks = [...users.map(u => () => tickUser(u)), ...active.map(s => () => tickBackgroundUser(s.user_id)), () => mt5AutoTick()];
         const results: PromiseSettledResult<unknown>[] = [];
         for (const task of tasks) results.push(...await Promise.allSettled([task()]));
         const failed = results.filter((r) => r.status === "rejected").length;
