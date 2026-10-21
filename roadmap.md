@@ -15,3 +15,4 @@
 - [x] Make chart dragging pan without accidental zoom; add explicit zoom and return-to-live controls.
 - [x] 1m Sniper scalping toggle (fast breakeven, 3-bar time stop, circuit breaker; re-enable clears cooldown)
 - [x] Sniper toggle lives in the bot card under the run switch; chart switches to 1m while it is on
+- [x] أولوية الإغلاق/التأمين ومنع تداخل الأوامر (يحتاج تحديث Relay عند نبراس)
