@@ -21,7 +21,7 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
   const out = [];
   for (const p of positions) {
     const tag = `mgr ${p.ticket}`;
-    const since = new Date(Date.now() - 30_000).toISOString();
+    const since = new Date(Date.now() - 60_000).toISOString();
     const [{ data: recent }, { data: partial }] = await Promise.all([
       db.from("mt5_commands").select("id").like("comment", `${tag}%`).gte("created_at", since).limit(1),
       db.from("mt5_commands").select("id").like("comment", `${tag} CLOSE_PARTIAL%`).limit(1),
@@ -33,11 +33,11 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
     if (d.action === "hold") { out.push({ ticket: p.ticket, action: "hold" }); continue; }
     const { error } = await db.from("mt5_commands").insert({
       action: d.action, symbol: "XAUUSD", ticket: p.ticket, lot: d.lot ?? p.volume, status: "pending",
-      comment: `${tag} ${d.action} ${d.reason}`, expires_at: new Date(Date.now() + 30_000).toISOString(),
+      comment: `${tag} ${d.action} ${d.reason}`, expires_at: new Date(Date.now() + 90_000).toISOString(),
     });
     if (error) { console.error("mgr insert", error); continue; }
     out.push({ ticket: p.ticket, ...d });
-    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🧠 إدارة ذكية\n${AR[d.action]}\n🎫 ${p.ticket} | ${p.type === "BUY" ? "شراء" : "بيع"} ${p.volume}\n📈 الحركة ${movePts(p).toFixed(2)} نقطة | ربح ${p.profit}$\n💡 ${WHY[d.reason] ?? d.reason}`); } catch (e) { console.error("notify", e); }
+    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🧠 إدارة ذكية — ⏳ أُرسل الأمر، بانتظار تأكيد MT5\n${AR[d.action]}\n🎫 ${p.ticket} | ${p.type === "BUY" ? "شراء" : "بيع"} ${p.volume}\n📈 الحركة ${movePts(p).toFixed(2)} نقطة | ربح ${p.profit}$\n💡 ${WHY[d.reason] ?? d.reason}`); } catch (e) { console.error("notify", e); }
   }
   return out;
 }
