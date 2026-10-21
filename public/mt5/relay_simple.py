@@ -53,19 +53,24 @@ def jsave(p, v):
 
 def iso(s): return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
+MAX_LOT = 0.10
+SNAPSHOT = FILES / "snapshot.json"
+
 def check(c):
     if c.get("action") not in ACTIONS: return "bad_action"
     if c.get("symbol") not in SYMBOLS: return "bad_symbol"
     if c["action"] in ("BUY", "SELL"):
-        if not c.get("lot") or c["lot"] <= 0 or c["lot"] > 0.01: return "lot_over_0.01"
+        if not c.get("lot") or c["lot"] <= 0 or c["lot"] > MAX_LOT: return "lot_over_max"
         if not c.get("sl") or c["sl"] <= 0: return "sl_required"
-    if c["action"] in ("CLOSE", "CLOSE_PARTIAL", "BREAKEVEN") and not c.get("ticket"): return "ticket_required"
+    # CLOSE/BREAKEVEN with ticket 0 = all positions on the symbol (EA handles it).
+    if c["action"] == "CLOSE_PARTIAL" and not c.get("ticket"): return "ticket_required"
     return None
 
 def run_ea(c):
     cid = c["command_id"]
     lines = [f"id={cid}", f"action={c['action']}", f"symbol={SYMBOLS[c['symbol']]}",
              f"lot={c.get('lot') or 0}", f"sl={c.get('sl') or 0}", f"tp={c.get('tp') or 0}",
+             f"sl_pts={c.get('sl_pts') or 0}", f"tp_pts={c.get('tp_pts') or 0}",
              f"ticket={c.get('ticket') or 0}", f"comment={(c.get('comment') or '')[:25]}"]
     cmd, res = FILES / f"cmd_{cid}.txt", FILES / f"res_{cid}.txt"
     tmp = FILES / f"tmp_{cid}.txt"; tmp.write_text("\n".join(lines) + "\n"); os.replace(tmp, cmd)
