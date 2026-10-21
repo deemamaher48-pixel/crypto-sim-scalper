@@ -1,11 +1,12 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
+import { turboBracket, turboSignal } from "@/lib/turbo-scalp";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 
-// Gold auto-bot for the MT5 bridge: indicator signal -> AI veto -> queue one BUY/SELL (0.01, SL+TP).
+// Gold auto-bot for the MT5 bridge: strategy signal -> (AI veto for SNIPER) -> queue one BUY/SELL (0.01, SL+TP).
 // MT5 holds SL/TP itself and the EA allows one position, so the cloud only spaces entries out.
-export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 3, maxPerDay: 6, symbol: "XAUUSD" };
+export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, symbol: "XAUUSD", strategy: "TURBO_SCALP_1M" as "TURBO_SCALP_1M" | "SNIPER_1M" };
 
 export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
@@ -22,15 +23,25 @@ export async function mt5AutoTick() {
   if (recent?.length) return { action: "wait", reason: "recent_entry" };
   if ((count ?? 0) >= AUTO.maxPerDay) return { action: "blocked", reason: "daily_limit" };
 
-  // Active strategy: SNIPER_1M lite (EMA 9/21 + RSI 9 + clean body) on closed 1m bars, 5m only as AI context.
-  const [k1, k5] = await Promise.all([loadGoldKlines({ interval: "1m" }), loadGoldKlines({ interval: "5m" })]);
-  const c1 = k1.rows.slice(0, -1), c5 = k5.rows.slice(0, -1);
-  const sig = sniperLiteSignal(c1);
-  if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
+  const k1 = await loadGoldKlines({ interval: "1m" });
+  const c1 = k1.rows.slice(0, -1);
   const price = k1.rows[k1.rows.length - 1]!.close;
-  const b = sniperLiteBracket(sig.side, price, sig.atr);
-  const ai = await aiReviewTrade({ symbol: "XAUUSD", side: sig.side, price, stop: b.stop, target: b.target, signalReason: sig.reason, bars: c1, filter: c5, frame: "1m" });
-  if (!ai.approve) return { action: "vetoed", reason: ai.reason };
+  let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string };
+  if (AUTO.strategy === "TURBO_SCALP_1M") {
+    // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
+    const sig = turboSignal(c1);
+    if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
+    side = sig.side; b = turboBracket(side, price); ai = { confidence: "T" };
+  } else {
+    const k5 = await loadGoldKlines({ interval: "5m" });
+    const sig = sniperLiteSignal(c1);
+    if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
+    side = sig.side; b = sniperLiteBracket(side, price, sig.atr);
+    const r = await aiReviewTrade({ symbol: "XAUUSD", side, price, stop: b.stop, target: b.target, signalReason: sig.reason, bars: c1, filter: k5.rows.slice(0, -1), frame: "1m" });
+    if (!r.approve) return { action: "vetoed", reason: r.reason };
+    ai = r;
+  }
+  const sig = { side };
 
   const { data, error } = await db.from("mt5_commands").insert({
     action: sig.side === "long" ? "BUY" : "SELL", symbol: AUTO.symbol, lot: AUTO.lot,
