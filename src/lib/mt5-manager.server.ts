@@ -2,7 +2,7 @@ import { manageDecision, movePts, type MgrPos } from "@/lib/mt5-manager";
 import { loadGoldKlines } from "@/functions/gold.functions";
 
 const AR: Record<string, string> = { BREAKEVEN: "🔒 تأمين الصفقة على الدخول", CLOSE_PARTIAL: "✂️ جني نصف الربح", CLOSE: "❌ خروج ذكي" };
-const WHY: Record<string, string> = { secure_entry: "السعر مشي لصالحنا", take_half: "وصل ربح كافي", reversal_lock_profit: "شمعة انعكاس قوية — حماية الربح", trend_flipped_cut_loss: "الاتجاه انقلب — تقليل الخسارة", momentum_flip_cut: "الزخم انقلب فجأة — خروج بخسارة صغيرة بدل الستوب", stall_exit: "السوق ركد — خروج بدون خسارة" };
+const WHY: Record<string, string> = { secure_entry: "السعر مشي لصالحنا", take_half: "وصل ربح كافي", reversal_lock_profit: "شمعة انعكاس قوية — حماية الربح", trend_flipped_cut_loss: "الاتجاه انقلب — تقليل الخسارة", momentum_flip_cut: "الزخم انقلب فجأة — خروج بخسارة صغيرة بدل الستوب", stall_exit: "السوق ركد — خروج بدون خسارة", tp_weak_take: "قريب من الهدف والزخم ضعف — أخذ الربح قبل التراجع" };
 
 // Runs each tick while MT5 reports open positions; one managing command per ticket per 2 minutes.
 export async function manageOpenPositions(db: any, positions: MgrPos[]) {
