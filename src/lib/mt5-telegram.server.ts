@@ -112,18 +112,17 @@ export async function mt5Action(a: string): Promise<{ text: string; kb: Kb }> {
     const sl = +(price - dir * c.sl_points).toFixed(2), tp = +(price + dir * c.tp_points).toFixed(2);
     const { data, error } = await d.from("mt5_commands").insert({
       action: k === "buy" ? "BUY" : "SELL", symbol: "XAUUSD", lot: c.lot, sl, tp,
-      status: "pending", comment: "telegram manual", expires_at: new Date(Date.now() + 30_000).toISOString(),
+      status: "pending", comment: `tg manual pts:${c.sl_points}/${c.tp_points}`, expires_at: new Date(Date.now() + 30_000).toISOString(),
     }).select("id").single();
     if (error) return mt5Panel(`⚠️ ما انبعت الأمر: ${error.message}`);
-    return mt5Panel(`${k === "buy" ? "🟢 أمر شراء" : "🔴 أمر بيع"} ${c.lot} انبعت لـ MT5\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${tp} | 🛑 الوقف ${sl}\n🆔 ${String(data.id).slice(0, 8)} — اضغطي 🔃 تحديث بعد ثواني`);
+    return mt5Panel(`${k === "buy" ? "🟢 أمر شراء" : "🔴 أمر بيع"} ${c.lot} انبعت لـ MT5\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف +${c.tp_points} | 🛑 الوقف -${c.sl_points} نقطة من سعر Inzo الفعلي\n🆔 ${String(data.id).slice(0, 8)} — اضغطي 🔃 تحديث بعد ثواني`);
   }
   if (k === "closeall" || k === "be") {
-    const { data: st } = await d.from("mt5_status").select("payload").eq("id", 1).maybeSingle();
-    const tickets = openTickets(st?.payload);
-    if (!tickets.length) return mt5Panel("ما في صفقات مفتوحة حاليًا");
+    // ticket 0 = every XAUUSD position inside MT5 (EA loops them), so it works even without known tickets.
     const exp = new Date(Date.now() + 60_000).toISOString();
-    for (const t of tickets) await d.from("mt5_commands").insert({ action: k === "be" ? "BREAKEVEN" : "CLOSE", symbol: "XAUUSD", ticket: t, status: "pending", comment: `telegram ${k}`, expires_at: exp });
-    return mt5Panel(k === "be" ? `🔒 انبعت تأمين على الدخول لـ ${tickets.length} صفقة` : `❌ انبعت إغلاق لـ ${tickets.length} صفقة`);
+    const { error } = await d.from("mt5_commands").insert({ action: k === "be" ? "BREAKEVEN" : "CLOSE", symbol: "XAUUSD", ticket: 0, status: "pending", comment: `telegram ${k}`, expires_at: exp });
+    if (error) return mt5Panel(`⚠️ ما انبعت الأمر: ${error.message}`);
+    return mt5Panel(k === "be" ? "🔒 انبعت تأمين على الدخول لكل صفقات الذهب" : "❌ انبعت إغلاق لكل صفقات الذهب — اضغطي 🔃 تحديث بعد ثواني");
   }
   return mt5Panel();
 }
