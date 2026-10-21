@@ -9,10 +9,10 @@ describe("turbo scalp", () => {
     expect(b.target).toBeCloseTo(4127.5);
     expect(b.stop).toBeCloseTo(4122.25);
   });
-  it("buys a green bar above EMA9 after mixed chop", () => {
+  it("does not buy in sideways chop", () => {
     const bars = Array.from({ length: 30 }, (_, i) => bar(4125 + (i % 2 ? 0.3 : 0), 4125 + (i % 2 ? 0 : 0.3), i));
     bars.push(bar(4125.2, 4126, 31));
-    expect(turboSignal(bars)?.side).toBe("long");
+    expect(turboSignal(bars)?.side ?? null).toBeNull();
   });
 });
 
