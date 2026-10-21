@@ -24,6 +24,8 @@ const sym = (s: string | undefined) => (s === 'PAXGUSDT' ? 'الذهب' : 'BTC')
 const f = (n: number | undefined, d = 2) => (n == null ? '-' : n.toFixed(d));
 
 export async function notifyTradeChanges(userId: string, before: Map<string, { closed: boolean; tp1: boolean }>, s: PaperState) {
+  return; // simulation alerts retired: Telegram is MT5-only now
+
   const chats = await adminFor(userId); if (!chats.length) return;
   const msgs: string[] = [];
   for (const t of s.trades.slice(0, 5)) {
