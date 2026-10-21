@@ -30,12 +30,11 @@ export const Route = createFileRoute("/api/public/mt5/result")({
         if (error) { console.error("result save", error); return Response.json({ error: "save_failed" }, { status: 500 }); }
         if (data?.length) {
           const c: any = data[0];
-          // Confirm protective actions only once MT5 actually reports back.
-          if (String(c.comment ?? "").startsWith("mgr ") || String(c.comment ?? "").startsWith("telegram ")) {
+          // Success is NOT announced here: the relay's ack can lie. verifyProtective() confirms from the live broker snapshot.
+          if (!r.success && (String(c.comment ?? "").startsWith("mgr ") || String(c.comment ?? "").startsWith("telegram "))) {
             const name: Record<string, string> = { CLOSE: "الإغلاق", CLOSE_PARTIAL: "الإغلاق الجزئي", BREAKEVEN: "التأمين" };
             if (name[c.action]) {
-              const msg = r.success ? `✅ تم ${name[c.action]} فعليًا على MT5\n🎫 ${c.ticket || "كل الصفقات"}${r.price ? ` @ ${r.price}` : ""}`
-                : `⚠️ فشل ${name[c.action]} على MT5\n🎫 ${c.ticket || "كل الصفقات"}\nالسبب: ${r.error ?? "غير معروف"}`;
+              const msg = `⚠️ فشل ${name[c.action]} على MT5\n🎫 ${c.ticket || "كل الصفقات"}\nالسبب: ${r.error ?? "غير معروف"}`;
               try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(msg); } catch (e) { console.error("notify", e); }
             }
           }
