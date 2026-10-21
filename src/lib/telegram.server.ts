@@ -43,7 +43,7 @@ export function dashboard(s: PaperState, last: string | null): { text: string; k
   const on = (b: boolean) => (b ? '🟢' : '🔴');
   return {
     text: `🤖 لوحة التحكم\n\nالحالة: ${s.enabled ? '🟢 يعمل' : '🔴 متوقف'} | ${sym(s.symbol)}\nالرصيد: $${f(s.usdt)} | اليوم: ${pnl >= 0 ? '+' : ''}${f(pnl)}$\nالصفقات المفتوحة: ${open}\nMT5: ⚪ غير مربوط (تداول تجريبي)\n\n${last ?? ''}`,
-    kb: [
+    kb: [[{ text: '🥇 لوحة MT5', callback_data: 'mt5' }],
       [{ text: `${on(s.enabled)} البوت: ${s.enabled ? 'يعمل' : 'متوقف'}`, callback_data: 'enable' }],
       [{ text: `${on(!s.sniper)} نظام 5m`, callback_data: 'm5' }, { text: `${on(s.sniper)} قناص 1m`, callback_data: 'm1' }],
       [{ text: `${on(s.newsShield !== false)} درع الأخبار`, callback_data: 'news' }, { text: `🔁 ${s.symbol === 'PAXGUSDT' ? 'إلى BTC' : 'إلى الذهب'}`, callback_data: 'sym' }],
