@@ -10,7 +10,7 @@ export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, symbo
 
 export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-  const { data: ctl } = await (db as any).from("mt5_control").select("emergency_stop,strategy").eq("id", 1).maybeSingle();
+  const { data: ctl } = await (db as any).from("mt5_control").select("emergency_stop,strategy,lot,tp_points,sl_points,max_per_day").eq("id", 1).maybeSingle();
   if (!ctl || ctl.emergency_stop) return { action: "idle", reason: "emergency_stop" };
   const strategy = (ctl as { strategy?: string }).strategy ?? AUTO.strategy;
   if (inRolloverWindow(Date.now())) return { action: "idle", reason: "rollover" };
@@ -22,7 +22,7 @@ export async function mt5AutoTick() {
     db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%").gte("created_at", day.toISOString()),
   ]);
   if (recent?.length) return { action: "wait", reason: "recent_entry" };
-  if ((count ?? 0) >= AUTO.maxPerDay) return { action: "blocked", reason: "daily_limit" };
+  if ((count ?? 0) >= (ctl.max_per_day ?? AUTO.maxPerDay)) return { action: "blocked", reason: "daily_limit" };
 
   const k1 = await loadGoldKlines({ interval: "1m" });
   const c1 = k1.rows.slice(0, -1);
@@ -32,7 +32,7 @@ export async function mt5AutoTick() {
     // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
-    side = sig.side; b = turboBracket(side, price); ai = { confidence: "T" };
+    side = sig.side; { const dd = side === "long" ? 1 : -1; b = ctl.tp_points ? { stop: price - dd * Number(ctl.sl_points), target: price + dd * Number(ctl.tp_points) } : turboBracket(side, price); } ai = { confidence: "T" };
   } else {
     const k5 = await loadGoldKlines({ interval: "5m" });
     const sig = sniperLiteSignal(c1);
@@ -45,10 +45,11 @@ export async function mt5AutoTick() {
   const sig = { side };
 
   const { data, error } = await db.from("mt5_commands").insert({
-    action: sig.side === "long" ? "BUY" : "SELL", symbol: AUTO.symbol, lot: AUTO.lot,
+    action: sig.side === "long" ? "BUY" : "SELL", symbol: AUTO.symbol, lot: Number(ctl.lot ?? AUTO.lot),
     sl: +b.stop.toFixed(2), tp: +b.target.toFixed(2), status: "pending",
     comment: `auto ai${ai.confidence}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
   }).select("id").single();
   if (error) throw error;
+  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${ctl.lot ?? AUTO.lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}`); } catch (e) { console.error("notify", e); }
   return { action: "queued", id: data.id, side: sig.side, sl: b.stop, tp: b.target };
 }

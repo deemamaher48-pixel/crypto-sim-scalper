@@ -160,7 +160,12 @@ export type Database = {
           allowed_symbols: string[]
           emergency_stop: boolean
           id: number
+          lot: number
           max_lot: number
+          max_per_day: number
+          sl_points: number
+          strategy: string
+          tp_points: number
           updated_at: string
           updated_by: string | null
         }
@@ -168,7 +173,12 @@ export type Database = {
           allowed_symbols?: string[]
           emergency_stop?: boolean
           id?: number
+          lot?: number
           max_lot?: number
+          max_per_day?: number
+          sl_points?: number
+          strategy?: string
+          tp_points?: number
           updated_at?: string
           updated_by?: string | null
         }
@@ -176,7 +186,12 @@ export type Database = {
           allowed_symbols?: string[]
           emergency_stop?: boolean
           id?: number
+          lot?: number
           max_lot?: number
+          max_per_day?: number
+          sl_points?: number
+          strategy?: string
+          tp_points?: number
           updated_at?: string
           updated_by?: string | null
         }
