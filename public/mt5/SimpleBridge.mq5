@@ -6,6 +6,40 @@
 #include <Trade/Trade.mqh>
 CTrade trade;
 input double MaxLot = 0.10;
+input double BeLockPts = 0.5;     // break-even locks this profit (price units)
+input double TrailStartPts = 3.0; // start trailing after this move
+input double TrailDistPts = 1.5;  // trail distance behind price
+input double MaxSpreadPts = 0.6;  // skip new entries when spread is wider
+
+// Move SL only toward profit (never loosen the hard stop).
+bool SafeSL(ulong tk, double newSl) {
+   if (!PositionSelectByTicket(tk)) return false;
+   string sy = PositionGetString(POSITION_SYMBOL);
+   int d = (int)SymbolInfoInteger(sy, SYMBOL_DIGITS);
+   bool b = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
+   double cur = PositionGetDouble(POSITION_SL), px = b ? SymbolInfoDouble(sy, SYMBOL_BID) : SymbolInfoDouble(sy, SYMBOL_ASK);
+   double minD = (SymbolInfoInteger(sy, SYMBOL_TRADE_STOPS_LEVEL) + 1) * SymbolInfoDouble(sy, SYMBOL_POINT);
+   newSl = NormalizeDouble(newSl, d);
+   if (b ? newSl > px - minD : newSl < px + minD) return false;
+   if (cur > 0 && (b ? newSl <= cur : newSl >= cur)) return true;
+   return trade.PositionModify(tk, newSl, PositionGetDouble(POSITION_TP));
+}
+bool LockBE(ulong tk) {
+   if (!PositionSelectByTicket(tk)) return false;
+   bool b = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY; double o = PositionGetDouble(POSITION_PRICE_OPEN);
+   if (SafeSL(tk, b ? o + BeLockPts : o - BeLockPts)) return true;
+   return SafeSL(tk, o); // price too close for +lock: fall back to entry
+}
+void Trail() {
+   for (int i = PositionsTotal() - 1; i >= 0; i--) {
+      ulong tk = PositionGetTicket(i); if (tk == 0) continue;
+      string sy = PositionGetString(POSITION_SYMBOL);
+      bool b = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
+      double o = PositionGetDouble(POSITION_PRICE_OPEN), px = b ? SymbolInfoDouble(sy, SYMBOL_BID) : SymbolInfoDouble(sy, SYMBOL_ASK);
+      double mv = b ? px - o : o - px;
+      if (mv >= TrailStartPts) SafeSL(tk, b ? px - TrailDistPts : px + TrailDistPts);
+   }
+}
 datetime lastSnap = 0;
 
 int OnInit() { EventSetMillisecondTimer(100); trade.SetDeviationInPoints(50); return INIT_SUCCEEDED; }
@@ -83,6 +117,8 @@ void Handle(string file) {
       if (lot <= 0 || lot > MaxLot) { Reply(id, false, 0, 0, "risk_rules_lot"); return; }
       if (CountOn(sym) > 0) { Reply(id, false, 0, 0, "already_open"); return; }
       bool buy = act == "BUY";
+      double spr = SymbolInfoDouble(sym, SYMBOL_ASK) - SymbolInfoDouble(sym, SYMBOL_BID);
+      if (spr > MaxSpreadPts) { Reply(id, false, 0, 0, "spread_wide"); return; }
       double px = buy ? SymbolInfoDouble(sym, SYMBOL_ASK) : SymbolInfoDouble(sym, SYMBOL_BID);
       if (slPts > 0) sl = NormalizeDouble(buy ? px - slPts : px + slPts, dg);
       if (tpPts > 0) tp = NormalizeDouble(buy ? px + tpPts : px - tpPts, dg);
@@ -107,7 +143,7 @@ void Handle(string file) {
       for (int i = PositionsTotal() - 1; i >= 0; i--) {
          if (PositionGetSymbol(i) != sym) continue;
          ulong tk = (ulong)PositionGetInteger(POSITION_TICKET);
-         bool r = act == "CLOSE" ? trade.PositionClose(tk) : trade.PositionModify(tk, PositionGetDouble(POSITION_PRICE_OPEN), PositionGetDouble(POSITION_TP));
+         bool r = act == "CLOSE" ? trade.PositionClose(tk) : LockBE(tk);
          if (r) done++; else fail++;
       }
       Reply(id, fail == 0, 0, 0, done + fail == 0 ? "no_positions" : (fail > 0 ? "failed_" + IntegerToString(fail) : ""));
@@ -118,7 +154,7 @@ void Handle(string file) {
    if (!PositionSelectByTicket(ticket)) { Reply(id, false, ticket, 0, "position_not_found"); return; }
    if (act == "CLOSE") ok = trade.PositionClose(ticket);
    else if (act == "CLOSE_PARTIAL") ok = trade.PositionClosePartial(ticket, MathMin(lot, PositionGetDouble(POSITION_VOLUME)));
-   else if (act == "BREAKEVEN") ok = trade.PositionModify(ticket, PositionGetDouble(POSITION_PRICE_OPEN), PositionGetDouble(POSITION_TP));
+   else if (act == "BREAKEVEN") ok = LockBE(ticket);
    else { Reply(id, false, ticket, 0, "bad_action"); return; }
    Reply(id, ok, ticket, trade.ResultPrice(), ok ? "" : trade.ResultRetcodeDescription());
    WriteSnapshot();
@@ -130,5 +166,6 @@ void OnTimer() {
       do { Handle(name); } while (FileFindNext(hf, name));
       FileFindClose(hf);
    }
+   Trail();
    if (TimeLocal() - lastSnap >= 5) { WriteSnapshot(); lastSnap = TimeLocal(); }
 }
