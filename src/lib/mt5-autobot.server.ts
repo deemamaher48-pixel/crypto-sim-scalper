@@ -64,6 +64,6 @@ export async function mt5AutoTick() {
     comment: `auto ai${ai.confidence} ${ptsTag(price, b)}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
   }).select("id").single();
   if (error) throw error;
-  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${ctl.lot ?? AUTO.lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}`); } catch (e) { console.error("notify", e); }
+  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${ctl.lot ?? AUTO.lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}${smartWhy ? `\n📐 ${smartWhy}` : ""}`); } catch (e) { console.error("notify", e); }
   return { action: "queued", id: data.id, side: sig.side, sl: b.stop, tp: b.target };
 }
