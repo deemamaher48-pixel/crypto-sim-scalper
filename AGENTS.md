@@ -22,3 +22,4 @@
 - MT5 VPS bridge: the VPS polls /api/public/mt5/poll and posts /report with a bearer key; commands queue in server-only mt5_commands — the VPS pulls, so no inbound port is needed.
 - MT5 auto-bot strategy is chosen by AUTO.strategy in src/lib/mt5-autobot.server.ts; SNIPER entries pass a fail-closed AI review, TURBO skips it by user choice for demo scalping — keeps strategy logic pure in src/lib and switchable.
 - MT5 entries carry SL/TP distances ("pts:SL/TP" in comment, parsed by /pending) and the EA re-anchors them on the broker fill; CLOSE/BREAKEVEN with ticket 0 apply to all symbol positions; relay posts EA snapshot.json to /api/public/mt5/status — broker price is the only truth for execution.
+- MT5 open positions are managed by the pure src/lib/mt5-manager.ts (break-even, half close, smart exit) from broker snapshot profit, one command per ticket per 2 min — broker numbers stay the truth and rules stay testable.

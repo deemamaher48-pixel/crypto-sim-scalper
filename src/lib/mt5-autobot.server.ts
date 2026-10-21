@@ -26,7 +26,10 @@ export async function mt5AutoTick() {
   // Live MT5 snapshot (relay posts every ~20s): don't spam entries while a position is open.
   const { data: st } = await (db as any).from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle();
   const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 120_000;
-  if (fresh && Array.isArray(st.payload?.positions) && st.payload.positions.length > 0) return { action: "wait", reason: "position_open" };
+  if (fresh && Array.isArray(st.payload?.positions) && st.payload.positions.length > 0) {
+    const { manageOpenPositions } = await import("@/lib/mt5-manager.server");
+    return { action: "manage", results: await manageOpenPositions(db, st.payload.positions) };
+  }
   if ((count ?? 0) >= (ctl.max_per_day ?? AUTO.maxPerDay)) return { action: "blocked", reason: "daily_limit" };
 
   const k1 = await loadGoldKlines({ interval: "1m" });
