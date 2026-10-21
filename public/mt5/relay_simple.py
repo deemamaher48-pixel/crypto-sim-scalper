@@ -94,8 +94,15 @@ def main():
     FILES.mkdir(parents=True, exist_ok=True)
     done = set(jload(DONE, [])); outbox = jload(PENDING_RESULTS, {})
     log.info("relay_simple start dry_run=%s files=%s", DRY, FILES)
+    last_snap = 0
     while True:
         try:
+            if time.time() - last_snap >= 20 and SNAPSHOT.exists():  # live balance/positions for Telegram
+                snap = jload(SNAPSHOT, None)
+                if isinstance(snap, dict):
+                    st, _ = api("POST", "/status", snap)
+                    if st != 200: log.warning("status HTTP %s", st)
+                last_snap = time.time()
             for cid, body in list(outbox.items()):  # retry unsent results
                 st, _ = api("POST", "/result", body)
                 if st in (200, 404): outbox.pop(cid); jsave(PENDING_RESULTS, outbox); log.info("result %s -> %s", cid, st)
