@@ -16,5 +16,14 @@ describe("mt5 manager", () => {
     const bars = [...flat.slice(0, 29), { open: 103, high: 103.05, low: 101, close: 101.1 }];
     expect(manageDecision(pos({ profit: 1 }), bars, false).action).toBe("CLOSE");
   });
+  it("secures entry at 1 point", () => expect(manageDecision(pos({ profit: 1 }), flat, false).action).toBe("BREAKEVEN"));
+  it("cuts a losing trade on a strong opposite candle", () => {
+    const bars = [...flat.slice(0, 29), { open: 103, high: 103.05, low: 101, close: 101.1 }];
+    expect(manageDecision(pos({ profit: -0.5 }), bars, false)).toMatchObject({ action: "CLOSE", reason: "momentum_flip_cut" });
+  });
+  it("exits a stalled trade near entry", () => {
+    const bars = [...flat.slice(0, 27), ...[0, 1, 2].map(() => ({ open: 102.8, high: 102.82, low: 102.79, close: 102.81 }))];
+    expect(manageDecision(pos({ profit: 0.1 }), bars, false)).toMatchObject({ action: "CLOSE", reason: "stall_exit" });
+  });
   it("holds a small loss", () => expect(manageDecision(pos({ profit: -0.5 }), flat, false).action).toBe("hold"));
 });
