@@ -43,14 +43,21 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
 }
 
 // Verify executed protective commands against the broker snapshot (truth), then announce once.
-export async function verifyProtective(db: any, positions: MgrPos[]) {
+export async function verifyProtective(db: any, positions: MgrPos[], snapAt?: string) {
   const since = new Date(Date.now() - 10 * 60_000).toISOString();
   const { data: cmds } = await db.from("mt5_commands").select("id,action,ticket,result,reported_at")
     .in("action", ["CLOSE", "BREAKEVEN", "CLOSE_PARTIAL"]).eq("status", "executed").gte("reported_at", since).limit(20);
   for (const c of cmds ?? []) {
     if (c.result?.verified !== undefined) continue;
-    if (Date.now() - Date.parse(c.reported_at) < 12_000) continue; // let the snapshot catch up
-    const mine = c.ticket ? positions.filter(p => p.ticket === c.ticket) : positions;
+    const age = Date.now() - Date.parse(c.reported_at);
+    if (age < 12_000) continue; // let the snapshot catch up
+    if (snapAt && Date.parse(snapAt) < Date.parse(c.reported_at) + 5_000) continue; // need a snapshot taken after the command
+    // Stale or "all positions" commands can't be tied to a ticket: close them silently, never spam.
+    if (!c.ticket || age > 3 * 60_000) {
+      await db.from("mt5_commands").update({ result: { ...c.result, verified: "silent" } }).eq("id", c.id).eq("status", "executed");
+      continue;
+    }
+    const mine = positions.filter(p => p.ticket === c.ticket);
     let ok: boolean;
     if (c.action === "CLOSE") ok = mine.length === 0;
     else if (c.action === "BREAKEVEN") ok = mine.length === 0 || mine.every(p => p.type === "BUY" ? p.sl > p.price_open : p.sl > 0 && p.sl < p.price_open);
@@ -75,7 +82,7 @@ export async function trackLoop(db: any, budgetMs = 45_000) {
     const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 30_000;
     if (!fresh) continue;
     const pos = Array.isArray(st.payload?.positions) ? st.payload.positions : [];
-    try { await verifyProtective(db, pos); } catch (e) { console.error("verify", e); }
+    try { await verifyProtective(db, pos, st.updated_at); } catch (e) { console.error("verify", e); }
     if (pos.length) { try { await manageOpenPositions(db, pos); } catch (e) { console.error("track", e); } }
   }
 }
