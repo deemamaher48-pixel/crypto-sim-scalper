@@ -14,7 +14,7 @@ async function bars() {
 }
 
 // One managing command per ticket per 30 seconds.
-export async function manageOpenPositions(db: any, positions: MgrPos[]) {
+export async function manageOpenPositions(db: any, positions: MgrPos[], balance?: number) {
   const { data: ctl } = await db.from("mt5_control").select("auto_manage").eq("id", 1).maybeSingle();
   if (ctl && ctl.auto_manage === false) return [{ action: "hold", reason: "auto_manage_off" }];
   const rows = await bars();
@@ -33,19 +33,19 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
     if (d.action === "hold") { out.push({ ticket: p.ticket, action: "hold" }); continue; }
     const { error } = await db.from("mt5_commands").insert({
       action: d.action, symbol: "XAUUSD", ticket: p.ticket, lot: d.lot ?? p.volume, status: "pending",
-      comment: `${tag} ${d.action} ${d.reason}`, expires_at: new Date(Date.now() + 90_000).toISOString(),
+      comment: `${tag} ${d.action} ${d.reason}${typeof balance === "number" ? ` bal:${balance}` : ""}`, expires_at: new Date(Date.now() + 90_000).toISOString(),
     });
     if (error) { console.error("mgr insert", error); continue; }
     out.push({ ticket: p.ticket, ...d });
-    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🧠 إدارة ذكية — ⏳ أُرسل الأمر، بانتظار تأكيد MT5\n${AR[d.action]}\n🎫 ${p.ticket} | ${p.type === "BUY" ? "شراء" : "بيع"} ${p.volume}\n📈 الحركة ${movePts(p).toFixed(2)} نقطة | ربح ${p.profit}$\n💡 ${WHY[d.reason] ?? d.reason}`); } catch (e) { console.error("notify", e); }
+    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🧠 إدارة ذكية — ⏳ أُرسل الأمر، بانتظار تأكيد MT5\n${AR[d.action]}\n🎫 ${p.ticket} | ${p.type === "BUY" ? "شراء" : "بيع"} ${p.volume}\n📈 الحركة ${movePts(p).toFixed(2)} نقطة | ربح تقريبي ${p.profit}$ (الرقم النهائي بعد التأكيد)\n💡 ${WHY[d.reason] ?? d.reason}`); } catch (e) { console.error("notify", e); }
   }
   return out;
 }
 
 // Verify executed protective commands against the broker snapshot (truth), then announce once.
-export async function verifyProtective(db: any, positions: MgrPos[], snapAt?: string) {
+export async function verifyProtective(db: any, positions: MgrPos[], snapAt?: string, balance?: number) {
   const since = new Date(Date.now() - 10 * 60_000).toISOString();
-  const { data: cmds } = await db.from("mt5_commands").select("id,action,ticket,result,reported_at")
+  const { data: cmds } = await db.from("mt5_commands").select("id,action,ticket,result,reported_at,comment")
     .in("action", ["CLOSE", "BREAKEVEN", "CLOSE_PARTIAL"]).eq("status", "executed").gte("reported_at", since).limit(20);
   for (const c of cmds ?? []) {
     if (c.result?.verified !== undefined) continue;
@@ -68,7 +68,11 @@ export async function verifyProtective(db: any, positions: MgrPos[], snapAt?: st
     if (!claimed?.length) continue;
     const name = c.action === "CLOSE" ? "الإغلاق" : c.action === "BREAKEVEN" ? "التأمين" : "الإغلاق الجزئي";
     const t = c.ticket || "كل الصفقات";
-    const msg = ok ? `✅ تأكد ${name} فعليًا على MT5\n🎫 ${t}` : `⚠️ MT5 ردّ بالنجاح بس ${name} ما صار فعليًا\n🎫 ${t}\nرح يعيد النظام المحاولة تلقائيًا`;
+    // Realized P/L = broker balance change (includes spread, commission, swap) — never our estimate.
+    const pre = Number(/bal:(-?[\d.]+)/.exec(c.comment ?? "")?.[1]);
+    const real = ok && c.action !== "BREAKEVEN" && Number.isFinite(pre) && typeof balance === "number" ? Math.round((balance - pre) * 100) / 100 : null;
+    const pl = real === null ? "" : `\n💰 الربح الفعلي من MT5: ${real >= 0 ? "+" : ""}${real.toFixed(2)}$\n🏦 الرصيد: ${balance!.toFixed(2)}$`;
+    const msg = ok ? `✅ تأكد ${name} فعليًا على MT5\n🎫 ${t}${pl}` : `⚠️ MT5 ردّ بالنجاح بس ${name} ما صار فعليًا\n🎫 ${t}\nرح يعيد النظام المحاولة تلقائيًا`;
     try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(msg); } catch (e) { console.error("notify", e); }
   }
 }
@@ -82,7 +86,7 @@ export async function trackLoop(db: any, budgetMs = 45_000) {
     const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 30_000;
     if (!fresh) continue;
     const pos = Array.isArray(st.payload?.positions) ? st.payload.positions : [];
-    try { await verifyProtective(db, pos, st.updated_at); } catch (e) { console.error("verify", e); }
-    if (pos.length) { try { await manageOpenPositions(db, pos); } catch (e) { console.error("track", e); } }
+    try { await verifyProtective(db, pos, st.updated_at, typeof st.payload?.balance === "number" ? st.payload.balance : undefined); } catch (e) { console.error("verify", e); }
+    if (pos.length) { try { await manageOpenPositions(db, pos, typeof st.payload?.balance === "number" ? st.payload.balance : undefined); } catch (e) { console.error("track", e); } }
   }
 }
