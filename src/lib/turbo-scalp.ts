@@ -90,11 +90,13 @@ export function signalStrength(side: Side, c1: Bar[], rr: number): number {
   const body = range > 0 ? Math.abs(bar.close - bar.open) / range : 0;
   const slope = (e[n]! - e[n - 3]!) * (side === "long" ? 1 : -1);
   const rsiOk = side === "long" ? r >= 52 && r <= 68 : r >= 32 && r <= 48;
-  return (body >= 0.6 ? 1 : 0) + (slope > 0 ? 1 : 0) + (rsiOk ? 1 : 0) + (rr >= 2 ? 1 : 0);
+  const pts = (body >= 0.6 ? 1 : 0) + (slope > 0 ? 1 : 0) + (rsiOk ? 1 : 0) + (rr >= 2 ? 1 : 0);
+  // Size-up only when the trend clearly agrees; otherwise cap strength at 2 (base lot).
+  return trendBias(c1) === side ? pts : Math.min(pts, 2);
 }
 
-/** Dynamic lot: base lot normally; 2× only at full strength (4/4), 1.5× at 3/4; never above maxLot. */
+/** Dynamic lot: base lot normally; 3× at full strength (4/4, trend-aligned), 2× at 3/4; never above maxLot. */
 export function dynamicLot(base: number, strength: number, maxLot = 0.03): number {
-  const m = strength >= 4 ? 2 : strength === 3 ? 1.5 : 1;
+  const m = strength >= 4 ? 3 : strength === 3 ? 2 : 1;
   return Math.min(maxLot, Math.max(base, Math.round(base * m * 100) / 100));
 }
