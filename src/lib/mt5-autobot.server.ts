@@ -5,7 +5,7 @@ import { loadGoldKlines } from "@/functions/gold.functions";
 
 // Gold auto-bot for the MT5 bridge: indicator signal -> AI veto -> queue one BUY/SELL (0.01, SL+TP).
 // MT5 holds SL/TP itself and the EA allows one position, so the cloud only spaces entries out.
-export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 45, maxPerDay: 6, symbol: "XAUUSD" };
+export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 3, maxPerDay: 6, symbol: "XAUUSD" };
 
 export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
@@ -16,7 +16,7 @@ export async function mt5AutoTick() {
   const since = new Date(Date.now() - AUTO.minGapMin * 60_000).toISOString();
   const day = new Date(); day.setUTCHours(0, 0, 0, 0);
   const [{ data: recent }, { count }] = await Promise.all([
-    db.from("mt5_commands").select("id").in("action", ["BUY", "SELL"]).neq("status", "cancelled").gte("created_at", since).limit(1),
+    db.from("mt5_commands").select("id").in("action", ["BUY", "SELL"]).like("comment", "auto%").neq("status", "cancelled").gte("created_at", since).limit(1),
     db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%").gte("created_at", day.toISOString()),
   ]);
   if (recent?.length) return { action: "wait", reason: "recent_entry" };
