@@ -1,6 +1,7 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
 import { turboBracket, turboSignal } from "@/lib/turbo-scalp";
+import { smartBracket } from "@/lib/smart-bracket";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
@@ -35,12 +36,17 @@ export async function mt5AutoTick() {
   const k1 = await loadGoldKlines({ interval: "1m" });
   const c1 = k1.rows.slice(0, -1);
   const price = k1.rows[k1.rows.length - 1]!.close;
-  let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string };
+  let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string }, smartWhy = "";
   if (strategy === "TURBO_SCALP_1M") {
     // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
-    side = sig.side; { const dd = side === "long" ? 1 : -1; b = ctl.tp_points ? { stop: price - dd * Number(ctl.sl_points), target: price + dd * Number(ctl.tp_points) } : turboBracket(side, price); } ai = { confidence: "T" };
+    side = sig.side;
+    // Smart bracket: the user's SL/TP points are maximums; real distances come from swings and nearby levels.
+    const fb = turboBracket(side, price);
+    const sb = smartBracket(side, price, c1, Number(ctl.sl_points ?? Math.abs(price - fb.stop)), Number(ctl.tp_points ?? Math.abs(fb.target - price)));
+    if (!sb.ok) return { action: "wait", reason: sb.why };
+    b = sb; smartWhy = sb.why; ai = { confidence: "T" };
   } else {
     const k5 = await loadGoldKlines({ interval: "5m" });
     const sig = sniperLiteSignal(c1);
@@ -58,6 +64,6 @@ export async function mt5AutoTick() {
     comment: `auto ai${ai.confidence} ${ptsTag(price, b)}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
   }).select("id").single();
   if (error) throw error;
-  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${ctl.lot ?? AUTO.lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}`); } catch (e) { console.error("notify", e); }
+  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${ctl.lot ?? AUTO.lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}${smartWhy ? `\n📐 ${smartWhy}` : ""}`); } catch (e) { console.error("notify", e); }
   return { action: "queued", id: data.id, side: sig.side, sl: b.stop, tp: b.target };
 }
