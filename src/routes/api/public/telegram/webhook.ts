@@ -74,11 +74,12 @@ async function handle(u: any) {
       await db.from('tg_license_keys').insert({ code, days });
       return T.tg('sendMessage', { chat_id: chatId, text: `🔑 كود تفعيل ${days} يوم:\n${code}\n\nالزبون يرسل للبوت: /redeem ${code}` });
     }
-    return home();
+    return show(await (await import('@/lib/mt5-telegram.server')).mt5Panel());
   }
 
   const d: string = cb?.data ?? 'home';
   const open = (s: PaperState) => s.trades.some(t => !t.closedAt);
+  if (d === 'mt5' || d.startsWith('mt5:')) { const M = await import('@/lib/mt5-telegram.server'); const note = d === 'mt5' ? undefined : await M.mt5Action(d.slice(4)); return show(await M.mt5Panel(note)); }
   if (d === 'home') return home();
   if (d === 'enable') return home((await mut(s => { s.enabled = !s.enabled; if (s.enabled && s.sniper) { s.sniperResetAt = Date.now(); s.sniperPausedUntil = 0; } return s.enabled ? 'تم تشغيل البوت' : 'تم إيقاف البوت'; })).message);
   if (d === 'm5' || d === 'm1') return home((await mut(s => { if (open(s)) throw new Error('أغلق الصفقة قبل التبديل'); s.sniper = d === 'm1'; s.lastCandle = 0; if (s.sniper) { s.sniperResetAt = Date.now(); s.sniperPausedUntil = 0; } return s.sniper ? 'تم تفعيل قناص 1m' : 'تم تفعيل نظام 5m'; })).message);

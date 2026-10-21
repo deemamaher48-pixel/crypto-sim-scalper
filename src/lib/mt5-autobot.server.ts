@@ -10,8 +10,9 @@ export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, symbo
 
 export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
-  const { data: ctl } = await db.from("mt5_control").select("emergency_stop").eq("id", 1).maybeSingle();
+  const { data: ctl } = await db.from("mt5_control").select("emergency_stop,strategy").eq("id", 1).maybeSingle();
   if (!ctl || ctl.emergency_stop) return { action: "idle", reason: "emergency_stop" };
+  const strategy = (ctl as { strategy?: string }).strategy ?? AUTO.strategy;
   if (inRolloverWindow(Date.now())) return { action: "idle", reason: "rollover" };
 
   const since = new Date(Date.now() - AUTO.minGapMin * 60_000).toISOString();
@@ -27,7 +28,7 @@ export async function mt5AutoTick() {
   const c1 = k1.rows.slice(0, -1);
   const price = k1.rows[k1.rows.length - 1]!.close;
   let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string };
-  if (AUTO.strategy === "TURBO_SCALP_1M") {
+  if (strategy === "TURBO_SCALP_1M") {
     // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
