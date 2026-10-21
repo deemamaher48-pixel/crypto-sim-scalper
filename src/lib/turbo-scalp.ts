@@ -40,3 +40,21 @@ export function chaseBlock(c1: Bar[], e9: number): Side | null {
   if (last.every((k) => k.close < k.open) || stretch < -2.0) return "short";
   return null;
 }
+
+/** Signal strength 0-4: strong body, EMA9 slope with trade, RSI in healthy momentum zone, reward/risk ≥ 2. */
+export function signalStrength(side: Side, c1: Bar[], rr: number): number {
+  const n = c1.length - 1, bar = c1[n]!;
+  const closes = c1.map((k) => k.close);
+  const e = ema(closes, 9), r = rsi(closes, 9)[n]!;
+  const range = bar.high - bar.low;
+  const body = range > 0 ? Math.abs(bar.close - bar.open) / range : 0;
+  const slope = (e[n]! - e[n - 3]!) * (side === "long" ? 1 : -1);
+  const rsiOk = side === "long" ? r >= 52 && r <= 68 : r >= 32 && r <= 48;
+  return (body >= 0.6 ? 1 : 0) + (slope > 0 ? 1 : 0) + (rsiOk ? 1 : 0) + (rr >= 2 ? 1 : 0);
+}
+
+/** Dynamic lot: base lot normally; 2× only at full strength (4/4), 1.5× at 3/4; never above maxLot. */
+export function dynamicLot(base: number, strength: number, maxLot = 0.03): number {
+  const m = strength >= 4 ? 2 : strength === 3 ? 1.5 : 1;
+  return Math.min(maxLot, Math.max(base, Math.round(base * m * 100) / 100));
+}
