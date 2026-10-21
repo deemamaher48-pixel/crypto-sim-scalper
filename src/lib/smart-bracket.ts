@@ -4,7 +4,7 @@
 import { type Side } from "@/lib/trading";
 import type { Bar } from "@/lib/smart-scalp";
 
-export const SMART = { minSl: 0.5, minTp: 0.5, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 0.8 } as const;
+export const SMART = { minSl: 0.5, minTp: 1.5, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 1.5 } as const;
 
 export type SmartBracket =
   | { ok: true; stop: number; target: number; slPts: number; tpPts: number; why: string }

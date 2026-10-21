@@ -5,13 +5,15 @@ import { ema, rsi } from "@/lib/trading";
 export type MgrPos = { ticket: number; type: "BUY" | "SELL"; volume: number; price_open: number; sl: number; tp: number; profit: number };
 export type MgrBar = { open: number; high: number; low: number; close: number };
 export type MgrDecision = { action: "hold" | "BREAKEVEN" | "CLOSE_PARTIAL" | "CLOSE"; reason: string; lot?: number };
-export const MGR = { bePts: 1.0, stallFrac: 0.35, stallMaxPts: 0.4, partialPts: 2.0, exitMinPts: 0.8, lossCutFrac: 0.7, pointValuePerLot: 100 };
+export const MGR = { bePts: 2.5, graceSec: 120, stallFrac: 0.35, stallMaxPts: 0.4, partialPts: 2.0, exitMinPts: 1.5, lossCutFrac: 0.7, pointValuePerLot: 100 };
 
 export function movePts(p: MgrPos) {
   return p.volume > 0 ? p.profit / (p.volume * MGR.pointValuePerLot) : 0;
 }
 
-export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean): MgrDecision {
+export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean, ageSec = Infinity): MgrDecision {
+  // Grace period: the broker hard SL protects the trade; no smart exits while it breathes.
+  if (ageSec < MGR.graceSec) return { action: "hold", reason: "grace" };
   const long = p.type === "BUY";
   const move = movePts(p);
   const slDist = p.sl > 0 ? Math.abs(p.price_open - p.sl) : 0;
