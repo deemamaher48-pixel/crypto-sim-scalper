@@ -1,6 +1,6 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
-import { turboBracket, turboSignal } from "@/lib/turbo-scalp";
+import { turboBracket, turboSignal, signalStrength, dynamicLot } from "@/lib/turbo-scalp";
 import { smartBracket } from "@/lib/smart-bracket";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
