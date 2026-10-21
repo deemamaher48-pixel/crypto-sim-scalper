@@ -3,6 +3,7 @@ import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
 import { turboBracket, turboSignal } from "@/lib/turbo-scalp";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
+import { ptsTag } from "@/lib/mt5-points";
 
 // Gold auto-bot for the MT5 bridge: strategy signal -> (AI veto for SNIPER) -> queue one BUY/SELL (0.01, SL+TP).
 // MT5 holds SL/TP itself and the EA allows one position, so the cloud only spaces entries out.
@@ -22,6 +23,10 @@ export async function mt5AutoTick() {
     db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%").gte("created_at", day.toISOString()),
   ]);
   if (recent?.length) return { action: "wait", reason: "recent_entry" };
+  // Live MT5 snapshot (relay posts every ~20s): don't spam entries while a position is open.
+  const { data: st } = await (db as any).from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle();
+  const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 120_000;
+  if (fresh && Array.isArray(st.payload?.positions) && st.payload.positions.length > 0) return { action: "wait", reason: "position_open" };
   if ((count ?? 0) >= (ctl.max_per_day ?? AUTO.maxPerDay)) return { action: "blocked", reason: "daily_limit" };
 
   const k1 = await loadGoldKlines({ interval: "1m" });
@@ -47,7 +52,7 @@ export async function mt5AutoTick() {
   const { data, error } = await db.from("mt5_commands").insert({
     action: sig.side === "long" ? "BUY" : "SELL", symbol: AUTO.symbol, lot: Number(ctl.lot ?? AUTO.lot),
     sl: +b.stop.toFixed(2), tp: +b.target.toFixed(2), status: "pending",
-    comment: `auto ai${ai.confidence}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
+    comment: `auto ai${ai.confidence} ${ptsTag(price, b)}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
   }).select("id").single();
   if (error) throw error;
   try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${ctl.lot ?? AUTO.lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}`); } catch (e) { console.error("notify", e); }
