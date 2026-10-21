@@ -74,8 +74,8 @@ def run_ea(c):
              f"ticket={c.get('ticket') or 0}", f"comment={(c.get('comment') or '')[:25]}"]
     cmd, res = FILES / f"cmd_{cid}.txt", FILES / f"res_{cid}.txt"
     tmp = FILES / f"tmp_{cid}.txt"; tmp.write_text("\n".join(lines) + "\n"); os.replace(tmp, cmd)
-    for _ in range(30):
-        time.sleep(0.5)
+    for _ in range(150):
+        time.sleep(0.1)
         if res.exists():
             kv = dict(l.split("=", 1) for l in res.read_text(errors="ignore").splitlines() if "=" in l)
             res.unlink(missing_ok=True)
@@ -127,7 +127,7 @@ def main():
                 if st in (200, 404): outbox.pop(cid); jsave(PENDING_RESULTS, outbox)
         except Exception as e:
             log.warning("loop error: %s", e)
-        time.sleep(2)
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     main()

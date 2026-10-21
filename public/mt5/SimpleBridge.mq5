@@ -8,7 +8,7 @@ CTrade trade;
 input double MaxLot = 0.10;
 datetime lastSnap = 0;
 
-int OnInit() { EventSetMillisecondTimer(500); trade.SetDeviationInPoints(50); return INIT_SUCCEEDED; }
+int OnInit() { EventSetMillisecondTimer(100); trade.SetDeviationInPoints(50); return INIT_SUCCEEDED; }
 void OnDeinit(const int r) { EventKillTimer(); }
 
 string Get(string &keys[], string &vals[], string k) {
