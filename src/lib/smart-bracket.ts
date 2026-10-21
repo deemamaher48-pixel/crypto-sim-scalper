@@ -38,7 +38,11 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
     .filter((b, i) => i > 0 && i < win.length - 1 && (long ? b.high >= win[i - 1]!.high && b.high >= win[i + 1]!.high : b.low <= win[i - 1]!.low && b.low <= win[i + 1]!.low))
     .map((b) => (long ? b.high : b.low))
     .filter((x) => (long ? x - entry : entry - x) >= SMART.minLevelDist);
-  let tp = maxTp, why = `وقف تحت ${long ? "القاع" : "القمة"} القريب`;
+  // Adaptive target: in a trend (last 10 bars moved ≥ 3×ATR our way) aim for the user max; when calm, ~2.5×ATR (min 2 pts).
+  const trendMove = (bars[bars.length - 1]!.close - bars[bars.length - 11]!.close) * d;
+  const trending = a > 0 && trendMove >= 3 * a;
+  let tp = trending ? maxTp : Math.min(maxTp, Math.max(2, a * 2.5));
+  let why = `وقف تحت ${long ? "القاع" : "القمة"} القريب | ${trending ? "ترند — هدف كامل" : "سوق هادي — هدف قريب"}`;
   if (levels.length) {
     const near = long ? Math.min(...levels) : Math.max(...levels);
     const dist = Math.abs(near - entry) - SMART.tpBuffer;
