@@ -1,6 +1,7 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
 import { turboBracket, turboSignal } from "@/lib/turbo-scalp";
+import { smartBracket } from "@/lib/smart-bracket";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
@@ -35,12 +36,17 @@ export async function mt5AutoTick() {
   const k1 = await loadGoldKlines({ interval: "1m" });
   const c1 = k1.rows.slice(0, -1);
   const price = k1.rows[k1.rows.length - 1]!.close;
-  let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string };
+  let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string }, smartWhy = "";
   if (strategy === "TURBO_SCALP_1M") {
     // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
-    side = sig.side; { const dd = side === "long" ? 1 : -1; b = ctl.tp_points ? { stop: price - dd * Number(ctl.sl_points), target: price + dd * Number(ctl.tp_points) } : turboBracket(side, price); } ai = { confidence: "T" };
+    side = sig.side;
+    // Smart bracket: the user's SL/TP points are maximums; real distances come from swings and nearby levels.
+    const fb = turboBracket(side, price);
+    const sb = smartBracket(side, price, c1, Number(ctl.sl_points ?? Math.abs(price - fb.stop)), Number(ctl.tp_points ?? Math.abs(fb.target - price)));
+    if (!sb.ok) return { action: "wait", reason: sb.why };
+    b = sb; smartWhy = sb.why; ai = { confidence: "T" };
   } else {
     const k5 = await loadGoldKlines({ interval: "5m" });
     const sig = sniperLiteSignal(c1);
