@@ -21,6 +21,7 @@ import { Route as ApiPublicMt5PendingRouteImport } from './routes/api/public/mt5
 import { Route as ApiPublicMt5PollRouteImport } from './routes/api/public/mt5/poll'
 import { Route as ApiPublicMt5ReportRouteImport } from './routes/api/public/mt5/report'
 import { Route as ApiPublicMt5ResultRouteImport } from './routes/api/public/mt5/result'
+import { Route as ApiPublicMt5StatusRouteImport } from './routes/api/public/mt5/status'
 import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -82,6 +83,11 @@ const ApiPublicMt5ResultRoute = ApiPublicMt5ResultRouteImport.update({
   path: '/api/public/mt5/result',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMt5StatusRoute = ApiPublicMt5StatusRouteImport.update({
+  id: '/api/public/mt5/status',
+  path: '/api/public/mt5/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTelegramWebhookRoute =
   ApiPublicTelegramWebhookRouteImport.update({
     id: '/api/public/telegram/webhook',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
   '/api/public/mt5/report': typeof ApiPublicMt5ReportRoute
   '/api/public/mt5/result': typeof ApiPublicMt5ResultRoute
+  '/api/public/mt5/status': typeof ApiPublicMt5StatusRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
   '/api/public/mt5/report': typeof ApiPublicMt5ReportRoute
   '/api/public/mt5/result': typeof ApiPublicMt5ResultRoute
+  '/api/public/mt5/status': typeof ApiPublicMt5StatusRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRoutesById {
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
   '/api/public/mt5/report': typeof ApiPublicMt5ReportRoute
   '/api/public/mt5/result': typeof ApiPublicMt5ResultRoute
+  '/api/public/mt5/status': typeof ApiPublicMt5StatusRoute
   '/api/public/telegram/webhook': typeof ApiPublicTelegramWebhookRoute
 }
 export interface FileRouteTypes {
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/api/public/mt5/poll'
     | '/api/public/mt5/report'
     | '/api/public/mt5/result'
+    | '/api/public/mt5/status'
     | '/api/public/telegram/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/api/public/mt5/poll'
     | '/api/public/mt5/report'
     | '/api/public/mt5/result'
+    | '/api/public/mt5/status'
     | '/api/public/telegram/webhook'
   id:
     | '__root__'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/api/public/mt5/poll'
     | '/api/public/mt5/report'
     | '/api/public/mt5/result'
+    | '/api/public/mt5/status'
     | '/api/public/telegram/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -189,6 +201,7 @@ export interface RootRouteChildren {
   ApiPublicMt5PollRoute: typeof ApiPublicMt5PollRoute
   ApiPublicMt5ReportRoute: typeof ApiPublicMt5ReportRoute
   ApiPublicMt5ResultRoute: typeof ApiPublicMt5ResultRoute
+  ApiPublicMt5StatusRoute: typeof ApiPublicMt5StatusRoute
   ApiPublicTelegramWebhookRoute: typeof ApiPublicTelegramWebhookRoute
 }
 
@@ -278,6 +291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMt5ResultRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/mt5/status': {
+      id: '/api/public/mt5/status'
+      path: '/api/public/mt5/status'
+      fullPath: '/api/public/mt5/status'
+      preLoaderRoute: typeof ApiPublicMt5StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/telegram/webhook': {
       id: '/api/public/telegram/webhook'
       path: '/api/public/telegram/webhook'
@@ -313,6 +333,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicMt5PollRoute: ApiPublicMt5PollRoute,
   ApiPublicMt5ReportRoute: ApiPublicMt5ReportRoute,
   ApiPublicMt5ResultRoute: ApiPublicMt5ResultRoute,
+  ApiPublicMt5StatusRoute: ApiPublicMt5StatusRoute,
   ApiPublicTelegramWebhookRoute: ApiPublicTelegramWebhookRoute,
 }
 export const routeTree = rootRouteImport
