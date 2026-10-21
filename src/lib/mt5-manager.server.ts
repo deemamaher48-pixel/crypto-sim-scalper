@@ -2,7 +2,7 @@ import { manageDecision, movePts, type MgrPos } from "@/lib/mt5-manager";
 import { loadGoldKlines } from "@/functions/gold.functions";
 
 const AR: Record<string, string> = { BREAKEVEN: "🔒 تأمين الصفقة على الدخول", CLOSE_PARTIAL: "✂️ جني نصف الربح", CLOSE: "❌ خروج ذكي" };
-const WHY: Record<string, string> = { secure_entry: "السعر مشي لصالحنا", take_half: "وصل ربح كافي", reversal_lock_profit: "شمعة انعكاس قوية — حماية الربح", trend_flipped_cut_loss: "الاتجاه انقلب — تقليل الخسارة", momentum_flip_cut: "الزخم انقلب فجأة — خروج بخسارة صغيرة بدل الستوب", stall_exit: "السوق ركد — خروج بدون خسارة", tp_weak_take: "قريب من الهدف والزخم ضعف — أخذ الربح قبل التراجع" };
+const WHY: Record<string, string> = { secure_entry: "السعر مشي 2.5 نقطة لصالحنا", take_half: "وصل ربح كافي", reversal_lock_profit: "شمعة انعكاس قوية — حماية الربح", trend_flipped_cut_loss: "الاتجاه انقلب — تقليل الخسارة", momentum_flip_cut: "الزخم انقلب فجأة — خروج بخسارة صغيرة بدل الستوب", stall_exit: "السوق ركد — خروج بدون خسارة", tp_weak_take: "قريب من الهدف والزخم ضعف — أخذ الربح قبل التراجع" };
 
 // Bars cached briefly so the fast tracking loop stays within the price API rate limit.
 let barCache: { at: number; rows: any[] } | null = null;
@@ -27,7 +27,9 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
       db.from("mt5_commands").select("id").like("comment", `${tag} CLOSE_PARTIAL%`).limit(1),
     ]);
     if (recent?.length) { out.push({ ticket: p.ticket, action: "wait" }); continue; }
-    const d = manageDecision(p, rows, !!partial?.length);
+    const { data: entry } = await db.from("mt5_commands").select("created_at").in("action", ["BUY", "SELL"]).contains("result", { ticket: p.ticket }).order("created_at", { ascending: false }).limit(1);
+    const ageSec = entry?.[0]?.created_at ? (Date.now() - Date.parse(entry[0].created_at)) / 1000 : Infinity;
+    const d = manageDecision(p, rows, !!partial?.length, ageSec);
     if (d.action === "hold") { out.push({ ticket: p.ticket, action: "hold" }); continue; }
     const { error } = await db.from("mt5_commands").insert({
       action: d.action, symbol: "XAUUSD", ticket: p.ticket, lot: d.lot ?? p.volume, status: "pending",

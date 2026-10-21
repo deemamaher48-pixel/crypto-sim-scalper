@@ -6,17 +6,18 @@ const pos = (o: Partial<Parameters<typeof manageDecision>[0]>) => ({ ticket: 1, 
 
 describe("mt5 manager", () => {
   it("0.01 lot with $1.50 profit is 1.5 points", () => expect(movePts(pos({ profit: 1.5 }))).toBeCloseTo(1.5));
-  it("secures entry at 1.5 points profit", () => expect(manageDecision(pos({ profit: 1.5 }), flat, false).action).toBe("BREAKEVEN"));
-  it("does not secure twice", () => expect(manageDecision(pos({ profit: 1.5, sl: 4000 }), flat, false).action).toBe("hold"));
+  it("does not secure below 2.5 points", () => expect(manageDecision(pos({ profit: 2 }), flat, false).action).toBe("hold"));
+  it("secures entry at 2.5 points profit", () => expect(manageDecision(pos({ profit: 2.5 }), flat, false).action).toBe("BREAKEVEN"));
+  it("holds everything during the first 120 seconds", () => expect(manageDecision(pos({ profit: 3 }), flat, false, 60).action).toBe("hold"));
+  it("does not secure twice", () => expect(manageDecision(pos({ profit: 2.5, sl: 4000 }), flat, false).action).toBe("hold"));
   it("takes half at 2 points on 0.02+ lots, once", () => {
     expect(manageDecision(pos({ volume: 0.04, profit: 8 }), flat, false)).toMatchObject({ action: "CLOSE_PARTIAL", lot: 0.02 });
-    expect(manageDecision(pos({ volume: 0.04, profit: 8 }), flat, true).action).toBe("BREAKEVEN");
+    expect(manageDecision(pos({ volume: 0.04, profit: 12 }), flat, true).action).toBe("BREAKEVEN");
   });
   it("closes in profit on a strong opposite candle", () => {
     const bars = [...flat.slice(0, 29), { open: 103, high: 103.05, low: 101, close: 101.1 }];
-    expect(manageDecision(pos({ profit: 1 }), bars, false).action).toBe("CLOSE");
+    expect(manageDecision(pos({ profit: 1.5 }), bars, false).action).toBe("CLOSE");
   });
-  it("secures entry at 1 point", () => expect(manageDecision(pos({ profit: 1 }), flat, false).action).toBe("BREAKEVEN"));
   it("cuts a losing trade on a strong opposite candle", () => {
     const bars = [...flat.slice(0, 29), { open: 103, high: 103.05, low: 101, close: 101.1 }];
     expect(manageDecision(pos({ profit: -0.5 }), bars, false)).toMatchObject({ action: "CLOSE", reason: "momentum_flip_cut" });

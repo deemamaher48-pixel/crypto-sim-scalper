@@ -4,7 +4,7 @@
 import { type Side } from "@/lib/trading";
 import type { Bar } from "@/lib/smart-scalp";
 
-export const SMART = { minSl: 0.5, minTp: 0.5, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 0.8 } as const;
+export const SMART = { minSl: 0.5, minTp: 1.5, buffer: 0.15, tpBuffer: 0.1, swingBars: 3, levelBars: 20, atrLen: 14, minRR: 1.5 } as const;
 
 export type SmartBracket =
   | { ok: true; stop: number; target: number; slPts: number; tpPts: number; why: string }
@@ -39,7 +39,8 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
     const dist = Math.abs(near - entry) - SMART.tpBuffer;
     if (dist < tp) { tp = dist; why += ` | هدف قبل ${long ? "مقاومة" : "دعم"} ${near.toFixed(2)}`; }
   }
-  if (tp < SMART.minTp || tp < sl * SMART.minRR) return { ok: false, why: `${long ? "مقاومة" : "دعم"} قريب جداً — عائد ضعيف` };
+  tp = r2(tp); sl = r2(sl);
+  if (tp < SMART.minTp || tp < r2(sl * SMART.minRR)) return { ok: false, why: `${long ? "مقاومة" : "دعم"} قريب جداً — عائد ضعيف` };
   sl = r2(sl); tp = r2(tp);
   return { ok: true, stop: r2(entry - d * sl), target: r2(entry + d * tp), slPts: sl, tpPts: tp, why };
 }
