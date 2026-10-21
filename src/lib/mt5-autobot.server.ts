@@ -5,10 +5,11 @@ import { smartBracket } from "@/lib/smart-bracket";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
+import { circuitBreaker } from "@/lib/circuit-breaker";
 
 // Gold auto-bot for the MT5 bridge: strategy signal -> (AI veto for SNIPER) -> queue one BUY/SELL (0.01, SL+TP).
 // MT5 holds SL/TP itself and the EA allows one position, so the cloud only spaces entries out.
-export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, maxLossStreak: 3, dailyLossUsd: 20, symbol: "XAUUSD", strategy: "TURBO_SCALP_1M" as "TURBO_SCALP_1M" | "SNIPER_1M" };
+export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, symbol: "XAUUSD", strategy: "TURBO_SCALP_1M" as "TURBO_SCALP_1M" | "SNIPER_1M" };
 
 export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
@@ -82,11 +83,3 @@ export async function mt5AutoTick() {
   return { action: "queued", id: data.id, side: sig.side, sl: b.stop, tp: b.target };
 }
 
-/** Pure: balances at successive entries + current balance → block reason (3 losses in a row, or daily loss limit). */
-export function circuitBreaker(bals: number[]): string | null {
-  if (bals.length < 2) return null;
-  if (bals[0]! - bals[bals.length - 1]! >= AUTO.dailyLossUsd) return "daily_loss_limit";
-  let streak = 0;
-  for (let i = bals.length - 1; i > 0; i--) { if (bals[i]! < bals[i - 1]!) streak++; else break; }
-  return streak >= AUTO.maxLossStreak ? "loss_streak_3" : null;
-}
