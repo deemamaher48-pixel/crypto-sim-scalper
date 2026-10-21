@@ -6,7 +6,7 @@ const flat = (n: number, lo: number, hi: number) =>
 
 describe("smartBracket", () => {
   it("uses a stop under 1 point when the recent low is close", () => {
-    const bars = [...flat(5, 99.7, 103), ...flat(20, 99.7, 100.2)]; // swing low 0.3 below, resistance far back
+    const bars = flat(25, 99.7, 99.95); bars[10] = { ...bars[10]!, high: 101.6 }; // quiet market, swing low 0.3 below
     const r = smartBracket("long", 100, bars, 2, 5);
     expect(r.ok && r.slPts).toBe(0.5); // swing 0.3 + 0.15 buffer -> min 0.5, not the fixed 2
   });
