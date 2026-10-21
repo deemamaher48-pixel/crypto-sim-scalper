@@ -39,7 +39,8 @@ export function smartBracket(side: Side, entry: number, bars: Bar[], maxSl: numb
     const dist = Math.abs(near - entry) - SMART.tpBuffer;
     if (dist < tp) { tp = dist; why += ` | هدف قبل ${long ? "مقاومة" : "دعم"} ${near.toFixed(2)}`; }
   }
-  if (tp < SMART.minTp || tp < sl * SMART.minRR) return { ok: false, why: `${long ? "مقاومة" : "دعم"} قريب جداً — عائد ضعيف` };
+  tp = r2(tp); sl = r2(sl);
+  if (tp < SMART.minTp || tp < r2(sl * SMART.minRR)) return { ok: false, why: `${long ? "مقاومة" : "دعم"} قريب جداً — عائد ضعيف` };
   sl = r2(sl); tp = r2(tp);
   return { ok: true, stop: r2(entry - d * sl), target: r2(entry + d * tp), slPts: sl, tpPts: tp, why };
 }
