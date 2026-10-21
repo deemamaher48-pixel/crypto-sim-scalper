@@ -32,7 +32,7 @@ export async function mt5AutoTick() {
   const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 120_000;
   if (fresh && Array.isArray(st.payload?.positions) && st.payload.positions.length > 0) {
     const { manageOpenPositions } = await import("@/lib/mt5-manager.server");
-    return { action: "manage", results: await manageOpenPositions(db, st.payload.positions) };
+    return { action: "manage", results: await manageOpenPositions(db, st.payload.positions, typeof st.payload?.balance === "number" ? st.payload.balance : undefined) };
   }
   if ((count ?? 0) >= (ctl.max_per_day ?? AUTO.maxPerDay)) return { action: "blocked", reason: "daily_limit" };
 
