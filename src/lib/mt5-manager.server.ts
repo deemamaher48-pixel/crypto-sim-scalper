@@ -22,7 +22,7 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
     const d = manageDecision(p, bars, !!partial?.length);
     if (d.action === "hold") { out.push({ ticket: p.ticket, action: "hold" }); continue; }
     const { error } = await db.from("mt5_commands").insert({
-      action: d.action, symbol: "XAUUSD", ticket: p.ticket, lot: d.lot ?? null, status: "pending",
+      action: d.action, symbol: "XAUUSD", ticket: p.ticket, lot: d.lot ?? p.volume, status: "pending",
       comment: `${tag} ${d.action} ${d.reason}`, expires_at: new Date(Date.now() + 60_000).toISOString(),
     });
     if (error) { console.error("mgr insert", error); continue; }
