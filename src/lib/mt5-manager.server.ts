@@ -37,7 +37,7 @@ export async function manageOpenPositions(db: any, positions: MgrPos[]) {
     });
     if (error) { console.error("mgr insert", error); continue; }
     out.push({ ticket: p.ticket, ...d });
-    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🧠 إدارة ذكية\n${AR[d.action]}\n🎫 ${p.ticket} | ${p.type === "BUY" ? "شراء" : "بيع"} ${p.volume}\n📈 الحركة ${movePts(p).toFixed(2)} نقطة | ربح ${p.profit}$\n💡 ${WHY[d.reason] ?? d.reason}`); } catch (e) { console.error("notify", e); }
+    try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🧠 إدارة ذكية — ⏳ أُرسل الأمر، بانتظار تأكيد MT5\n${AR[d.action]}\n🎫 ${p.ticket} | ${p.type === "BUY" ? "شراء" : "بيع"} ${p.volume}\n📈 الحركة ${movePts(p).toFixed(2)} نقطة | ربح ${p.profit}$\n💡 ${WHY[d.reason] ?? d.reason}`); } catch (e) { console.error("notify", e); }
   }
   return out;
 }
