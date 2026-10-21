@@ -24,6 +24,9 @@ export async function mt5AutoTick() {
     db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%").gte("created_at", day.toISOString()),
   ]);
   if (recent?.length) return { action: "wait", reason: "recent_entry" };
+  // Never stack entries: wait while any entry (auto or manual) is still queued and unexpired.
+  const { data: queued } = await db.from("mt5_commands").select("id").in("action", ["BUY", "SELL"]).in("status", ["pending", "leased"]).gt("expires_at", new Date().toISOString()).limit(1);
+  if (queued?.length) return { action: "wait", reason: "entry_in_queue" };
   // Live MT5 snapshot (relay posts every ~20s): don't spam entries while a position is open.
   const { data: st } = await (db as any).from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle();
   const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 120_000;

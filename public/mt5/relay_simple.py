@@ -121,6 +121,11 @@ def main():
                     done.add(cid); continue
                 done.add(cid); jsave(DONE, sorted(done))  # mark first: at-most-once
                 result = {"command_id": cid, "success": False, "error": err} if err else run_ea(c)
+                # Protective actions: retry twice if MT5 rejected (e.g. price moved during modify).
+                tries = 0
+                while not err and not result.get("success") and c["action"] in ("CLOSE", "BREAKEVEN", "CLOSE_PARTIAL") \
+                        and result.get("error") not in ("no_positions", "position_not_found", "ea_not_running") and tries < 2:
+                    tries += 1; time.sleep(0.3); result = run_ea(c)
                 log.info("executed %s %s -> %s", cid, c["action"], result)
                 outbox[cid] = result; jsave(PENDING_RESULTS, outbox)
                 st, _ = api("POST", "/result", result)
