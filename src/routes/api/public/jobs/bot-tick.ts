@@ -24,6 +24,8 @@ export const Route = createFileRoute("/api/public/jobs/bot-tick")({
         const tasks = [...users.map(u => () => tickUser(u)), ...active.map(s => () => tickBackgroundUser(s.user_id)), () => mt5AutoTick()];
         const results: PromiseSettledResult<unknown>[] = [];
         for (const task of tasks) results.push(...await Promise.allSettled([task()]));
+        const { trackLoop } = await import("@/lib/mt5-manager.server");
+        await trackLoop(supabaseAdmin).catch(e => console.error("trackLoop", e));
         const failed = results.filter((r) => r.status === "rejected").length;
         return Response.json({ users: tasks.length, failed });
       },

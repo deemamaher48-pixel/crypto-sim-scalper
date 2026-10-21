@@ -97,7 +97,7 @@ def main():
     last_snap = 0
     while True:
         try:
-            if time.time() - last_snap >= 20 and SNAPSHOT.exists():  # live balance/positions for Telegram
+            if time.time() - last_snap >= 3 and SNAPSHOT.exists():  # live balance/positions for Telegram
                 snap = jload(SNAPSHOT, None)
                 if isinstance(snap, dict):
                     st, _ = api("POST", "/status", snap)
@@ -109,7 +109,7 @@ def main():
             st, data = api("GET", "/pending")
             if st != 200: log.warning("pending HTTP %s", st); time.sleep(5); continue
             if data.get("emergency_stop"):
-                time.sleep(2); continue
+                time.sleep(1); continue
             now = iso(data["server_time"])
             for c in data.get("commands", []):
                 cid = c["command_id"]
@@ -127,7 +127,7 @@ def main():
                 if st in (200, 404): outbox.pop(cid); jsave(PENDING_RESULTS, outbox)
         except Exception as e:
             log.warning("loop error: %s", e)
-        time.sleep(0.5)
+        time.sleep(0.25)
 
 if __name__ == "__main__":
     main()
