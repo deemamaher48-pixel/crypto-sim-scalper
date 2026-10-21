@@ -23,7 +23,6 @@ export const Route = createFileRoute('/api/public/telegram/webhook')({
 async function handle(u: any) {
   const T = await import('@/lib/telegram.server');
   const { supabaseAdmin: db } = await import('@/integrations/supabase/client.server');
-  const { mutatePaper, tickBackgroundUser } = await import('@/functions/background.functions');
   const msg = u.message, cb = u.callback_query;
   const chatId: number | undefined = msg?.chat?.id ?? cb?.message?.chat?.id;
   const fromId: number | undefined = msg?.from?.id ?? cb?.from?.id;
