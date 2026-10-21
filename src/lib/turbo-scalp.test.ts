@@ -22,3 +22,13 @@ _it("blocks buying after 4 green candles in a row", () => {
   const bars = Array.from({ length: 20 }, (_, i) => ({ time: i, open: 100 + i, close: 100.5 + i, high: 101 + i, low: 99.8 + i }));
   _ex(_cb(bars as never, 119)).toBe("long");
 });
+_it("never buys against a falling trend", () => {
+  const down = Array.from({ length: 60 }, (_, i) => bar(4200 - i * 0.5, 4199.6 - i * 0.5, i));
+  down.push(bar(4170, 4170.6, 61));
+  _ex(turboSignal(down)?.side).not.toBe("long");
+});
+_it("never sells against a rising trend", () => {
+  const up = Array.from({ length: 60 }, (_, i) => bar(4100 + i * 0.5, 4100.4 + i * 0.5, i));
+  up.push(bar(4130.4, 4129.8, 61));
+  _ex(turboSignal(up)?.side).not.toBe("short");
+});
