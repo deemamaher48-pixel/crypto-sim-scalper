@@ -1,7 +1,6 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
-import { turboBracket, turboSignal, signalStrength, dynamicLot } from "@/lib/turbo-scalp";
-import { smartBracket } from "@/lib/smart-bracket";
+import { asianRange, dailyPivot, engineTurbo, pivotBias, scoreLot, sessionAt } from "@/lib/session-engine";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
@@ -139,7 +138,7 @@ async function tick() {
     if (adapt.note) smartWhy += ` | 🧠 ${adapt.note}`;
     if (news) {
       const k5 = await loadGoldKlines({ interval: "5m" });
-      const r = await aiReviewTrade({ symbol: "XAUUSD", side, price, stop: sb.stop, target: sb.target, signalReason: `NEWS TURBO after ${news.why}: ${sig.reason}. Confirm the post-news direction is real, not a fakeout.`, bars: c1, filter: k5.rows.slice(0, -1), frame: "1m" });
+      const r = await aiReviewTrade({ symbol: "XAUUSD", side, price, stop: b.stop, target: b.target, signalReason: `NEWS TURBO after ${news.why}: ${sig.reason}. Confirm the post-news direction is real, not a fakeout.`, bars: c1, filter: k5.rows.slice(0, -1), frame: "1m" });
       if (!r.approve) return { action: "vetoed", reason: `📰 AI رفض صفقة الخبر: ${r.reason}` };
       ai = r; swingTag = "NW "; lot = Number(ctl.lot ?? AUTO.lot);
       smartWhy = `📰 تيربو خبر (${news.why}) | AI ${r.confidence}% — ${r.reason}`;
