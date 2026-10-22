@@ -23,7 +23,7 @@ export async function manageOpenPositions(db: any, positions: MgrPos[], balance?
   const out = [];
   for (const p of positions) {
     const tag = `mgr ${p.ticket}`;
-    const since = new Date(Date.now() - 60_000).toISOString();
+    const since = new Date(Date.now() - 30_000).toISOString();
     const [{ data: recent }, { data: partial }] = await Promise.all([
       db.from("mt5_commands").select("id").like("comment", `${tag}%`).gte("created_at", since).limit(1),
       db.from("mt5_commands").select("id").like("comment", `${tag} CLOSE_PARTIAL%`).limit(1),
@@ -80,11 +80,11 @@ export async function verifyProtective(db: any, positions: MgrPos[], snapAt?: st
   }
 }
 
-// Fast tracking: re-check open positions every ~10s for most of the minute between cron ticks.
+// Fast tracking: re-check open positions every ~5s for most of the minute between cron ticks.
 export async function trackLoop(db: any, budgetMs = 45_000) {
   const end = Date.now() + budgetMs;
   while (Date.now() < end) {
-    await new Promise(r => setTimeout(r, 10_000));
+    await new Promise(r => setTimeout(r, 5_000));
     const { data: st } = await db.from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle();
     const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 30_000;
     if (!fresh) continue;

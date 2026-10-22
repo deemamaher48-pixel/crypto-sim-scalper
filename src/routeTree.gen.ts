@@ -16,6 +16,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedTradesRouteImport } from './routes/_authenticated/trades'
 import { Route as ApiPublicJobsBotTickRouteImport } from './routes/api/public/jobs/bot-tick'
+import { Route as ApiPublicJobsDailyReportRouteImport } from './routes/api/public/jobs/daily-report'
 import { Route as ApiPublicMt5AuthCheckRouteImport } from './routes/api/public/mt5/auth-check'
 import { Route as ApiPublicMt5PendingRouteImport } from './routes/api/public/mt5/pending'
 import { Route as ApiPublicMt5PollRouteImport } from './routes/api/public/mt5/poll'
@@ -58,6 +59,12 @@ const ApiPublicJobsBotTickRoute = ApiPublicJobsBotTickRouteImport.update({
   path: '/api/public/jobs/bot-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsDailyReportRoute =
+  ApiPublicJobsDailyReportRouteImport.update({
+    id: '/api/public/jobs/daily-report',
+    path: '/api/public/jobs/daily-report',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicMt5AuthCheckRoute = ApiPublicMt5AuthCheckRouteImport.update({
   id: '/api/public/mt5/auth-check',
   path: '/api/public/mt5/auth-check',
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/trades': typeof AuthenticatedTradesRoute
   '/api/public/jobs/bot-tick': typeof ApiPublicJobsBotTickRoute
+  '/api/public/jobs/daily-report': typeof ApiPublicJobsDailyReportRoute
   '/api/public/mt5/auth-check': typeof ApiPublicMt5AuthCheckRoute
   '/api/public/mt5/pending': typeof ApiPublicMt5PendingRoute
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
@@ -117,6 +125,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/trades': typeof AuthenticatedTradesRoute
   '/api/public/jobs/bot-tick': typeof ApiPublicJobsBotTickRoute
+  '/api/public/jobs/daily-report': typeof ApiPublicJobsDailyReportRoute
   '/api/public/mt5/auth-check': typeof ApiPublicMt5AuthCheckRoute
   '/api/public/mt5/pending': typeof ApiPublicMt5PendingRoute
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/trades': typeof AuthenticatedTradesRoute
   '/api/public/jobs/bot-tick': typeof ApiPublicJobsBotTickRoute
+  '/api/public/jobs/daily-report': typeof ApiPublicJobsDailyReportRoute
   '/api/public/mt5/auth-check': typeof ApiPublicMt5AuthCheckRoute
   '/api/public/mt5/pending': typeof ApiPublicMt5PendingRoute
   '/api/public/mt5/poll': typeof ApiPublicMt5PollRoute
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/trades'
     | '/api/public/jobs/bot-tick'
+    | '/api/public/jobs/daily-report'
     | '/api/public/mt5/auth-check'
     | '/api/public/mt5/pending'
     | '/api/public/mt5/poll'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/trades'
     | '/api/public/jobs/bot-tick'
+    | '/api/public/jobs/daily-report'
     | '/api/public/mt5/auth-check'
     | '/api/public/mt5/pending'
     | '/api/public/mt5/poll'
@@ -182,6 +194,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/trades'
     | '/api/public/jobs/bot-tick'
+    | '/api/public/jobs/daily-report'
     | '/api/public/mt5/auth-check'
     | '/api/public/mt5/pending'
     | '/api/public/mt5/poll'
@@ -196,6 +209,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicJobsBotTickRoute: typeof ApiPublicJobsBotTickRoute
+  ApiPublicJobsDailyReportRoute: typeof ApiPublicJobsDailyReportRoute
   ApiPublicMt5AuthCheckRoute: typeof ApiPublicMt5AuthCheckRoute
   ApiPublicMt5PendingRoute: typeof ApiPublicMt5PendingRoute
   ApiPublicMt5PollRoute: typeof ApiPublicMt5PollRoute
@@ -254,6 +268,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/jobs/bot-tick'
       fullPath: '/api/public/jobs/bot-tick'
       preLoaderRoute: typeof ApiPublicJobsBotTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/jobs/daily-report': {
+      id: '/api/public/jobs/daily-report'
+      path: '/api/public/jobs/daily-report'
+      fullPath: '/api/public/jobs/daily-report'
+      preLoaderRoute: typeof ApiPublicJobsDailyReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/mt5/auth-check': {
@@ -328,6 +349,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiPublicJobsBotTickRoute: ApiPublicJobsBotTickRoute,
+  ApiPublicJobsDailyReportRoute: ApiPublicJobsDailyReportRoute,
   ApiPublicMt5AuthCheckRoute: ApiPublicMt5AuthCheckRoute,
   ApiPublicMt5PendingRoute: ApiPublicMt5PendingRoute,
   ApiPublicMt5PollRoute: ApiPublicMt5PollRoute,
