@@ -4,7 +4,7 @@ import type { Side } from "@/lib/trading";
 export type Outcome = { side: Side; pnl: number };
 export type Adapt = { blockSide: Side | null; minStrength: number; note: string };
 
-export const LEARN = { window: 6, sideLosses: 2, poorWinRate: 0.4, strictStrength: 3 } as const;
+export const LEARN = { window: 6, sideLosses: 2, poorWinRate: 0.4, strictStrength: 3, minUsd: 1.5 } as const;
 
 /** Entries (side + balance at entry, oldest first) + current balance → closed outcomes. */
 export function outcomesFrom(entries: { side: Side; bal: number }[], current: number): Outcome[] {
@@ -13,7 +13,8 @@ export function outcomesFrom(entries: { side: Side; bal: number }[], current: nu
 
 /** Learns from the last trades: a side that lost twice in a row is paused; a poor win rate demands stronger signals. */
 export function adaptTurbo(outcomes: Outcome[]): Adapt {
-  const recent = outcomes.slice(-LEARN.window);
+  // Small smart-exit trims (|pnl| < minUsd) are neutral: neither a loss nor a win.
+  const recent = outcomes.filter((o) => Math.abs(o.pnl) >= LEARN.minUsd).slice(-LEARN.window);
   let blockSide: Side | null = null;
   for (const s of ["long", "short"] as Side[]) {
     const own = recent.filter((o) => o.side === s).slice(-LEARN.sideLosses);
