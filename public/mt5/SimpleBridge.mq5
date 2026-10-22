@@ -6,6 +6,9 @@
 #include <Trade/Trade.mqh>
 CTrade trade;
 input double MaxLot = 0.10;
+input int    MaxPositions = 2;   // swing + turbo at the same time
+input double SwTrailStartPts = 8.0; // swing trades: trail only after +8
+input double SwTrailDistPts = 4.0;  // swing trail distance
 input double BeLockPts = 0.5;     // break-even locks this profit (price units)
 input double TrailStartPts = 3.0; // start trailing after this move
 input double TrailDistPts = 1.5;  // trail distance behind price
@@ -72,6 +75,10 @@ void Trail() {
       bool b = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
       double o = PositionGetDouble(POSITION_PRICE_OPEN), px = b ? SymbolInfoDouble(sy, SYMBOL_BID) : SymbolInfoDouble(sy, SYMBOL_ASK);
       double mv = b ? px - o : o - px;
+      if (StringFind(PositionGetString(POSITION_COMMENT), "auto SW") == 0) { // swing: wide trail, no TP extension
+         if (mv >= SwTrailStartPts) SafeSL(tk, b ? px - SwTrailDistPts : px + SwTrailDistPts);
+         continue;
+      }
       ExtendTP(tk, sy, b, o, px, mv);
       if (!PositionSelectByTicket(tk)) continue;
       double td = ExtCount(tk) > 0 ? ExtTrailDistPts : TrailDistPts;
@@ -154,7 +161,7 @@ void Handle(string file) {
 
    if (act == "BUY" || act == "SELL") {
       if (lot <= 0 || lot > MaxLot) { Reply(id, false, 0, 0, "risk_rules_lot"); return; }
-      if (CountOn(sym) > 0) { Reply(id, false, 0, 0, "already_open"); return; }
+      if (CountOn(sym) >= MaxPositions) { Reply(id, false, 0, 0, "already_open"); return; }
       bool buy = act == "BUY";
       double spr = SymbolInfoDouble(sym, SYMBOL_ASK) - SymbolInfoDouble(sym, SYMBOL_BID);
       if (spr > MaxSpreadPts) { Reply(id, false, 0, 0, "spread_wide"); return; }
