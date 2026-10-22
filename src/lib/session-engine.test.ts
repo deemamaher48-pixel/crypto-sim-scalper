@@ -14,7 +14,7 @@ describe("session engine", () => {
   });
   it("computes the classic pivot from yesterday's bars", () => {
     const y = Date.UTC(2026, 9, 21);
-    const h1 = Array.from({ length: 24 }, (_, i) => ({ time: y + i * 3_600_000, open: 100, high: i === 5 ? 110 : 102, low: i === 9 ? 90 : 98, close: 100 }));
+    const h1 = Array.from({ length: 24 }, (_, i) => ({ time: y + i * 3_600_000, open: 100, high: i === 5 ? 110 : 102, low: i === 9 ? 90 : 98, close: 100, volume: 0 }));
     const p = dailyPivot(h1, at(10))!;
     expect(p.P).toBeCloseTo(100);
     expect(p.R1).toBeCloseTo(110);
