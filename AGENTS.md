@@ -29,3 +29,4 @@
 - Circuit breaker only counts losses ≥ $1.5; the bot posts its stop reason to Telegram once per change (state kept in mt5_status id=2) — the user should never have to ask why it stopped.
 - News window: block before/at release; max 2 AI-reviewed turbo trades after, via pure src/lib/news-window.ts (scheduled UTC times + live 1m spike) — keeps news rules testable.
 - News gating uses only the fixed schedule and live 1m price spikes (src/lib/news-window.ts); channel text is not read — user wants decisions from price action only.
+- MT5 TURBO entries come from the session engine (pure src/lib/session-engine.ts): UTC sessions, daily pivot bias on the last 5m close, Asia-range breakout at London open, flexible EMA9/21 pullback or micro-breakout; score sets lot (max 0.03, base while another trade is unsecured) and turbo break-even is session-aware — replaces the old turboSignal/smart-bracket gate for entries.
