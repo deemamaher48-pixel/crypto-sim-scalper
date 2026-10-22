@@ -27,6 +27,5 @@
 - TURBO self-learning lives in pure src/lib/turbo-learn.ts: today's real outcomes (bal: tags) pause a side after 2 straight losses and demand stronger signals on a poor win rate — adapts without changing the base strategy.
 - MT5 runs two slots: one SWING (pure src/lib/swing.ts: 1H EMA50/200 trend + 15m BOS/EMA21 pullback, AI-approved, comment "auto SW") and one TURBO; swing positions (stop ≥3.5 pts) get their own management and EA trail — turbo rules would cut swings early.
 - Circuit breaker only counts losses ≥ $1.5; the bot posts its stop reason to Telegram once per change (state kept in mt5_status id=2) — the user should never have to ask why it stopped.
-- News window: block before/at release; max 2 AI-reviewed turbo trades after, via pure src/lib/news-window.ts (scheduled UTC times + live 1m spike) — keeps news rules testable.
-- News gating uses only the fixed schedule and live 1m price spikes (src/lib/news-window.ts); channel text is not read — user wants decisions from price action only.
+- News window (src/lib/news-window.ts) is disabled in mt5-autobot via NEWS_GUARD=false by user choice — re-enable by flipping the flag.
 - MT5 TURBO entries come from the session engine (pure src/lib/session-engine.ts): UTC sessions, daily pivot bias on the last 5m close, Asia-range breakout at London open, flexible EMA9/21 pullback or micro-breakout; score sets lot (max 0.03, base while another trade is unsecured) and turbo break-even is session-aware — replaces the old turboSignal/smart-bracket gate for entries.
