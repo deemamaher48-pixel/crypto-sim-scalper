@@ -123,10 +123,14 @@ async function tick() {
       const { count: nw } = await db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%NW%").neq("status", "cancelled").gte("created_at", new Date(news.start).toISOString());
       if ((nw ?? 0) >= NEWS.maxTrades) return { action: "wait", reason: "📰 خلصت صفقتين الخبر" };
     }
-    if (!bias) return { action: "wait", reason: "ما في بيفوت يومي جاهز" };
-    // Session engine: Asia pivot bounce / London Asia-range breakout / flexible trend pullback or micro-breakout.
+    // Turbo direction follows the 1m trend (EMA21 vs EMA50), not the daily pivot — user choice.
+    const { ema } = await import("@/lib/trading");
+    const cls = c1.map((k) => k.close);
+    const t21 = ema(cls, 21).at(-1)!, t50 = ema(cls, 50).at(-1)!;
+    const turboBias: "long" | "short" = t21 > t50 ? "long" : "short";
+    // Session engine: Asia bounce / London Asia-range breakout / flexible trend pullback or micro-breakout.
     const swingPos = positions.find((p) => isSwingPos(p));
-    const sig = engineTurbo(c1, session, bias, asianRange(ms(m15), now), swingPos ? (swingPos.type === "BUY" ? "long" : "short") : null);
+    const sig = engineTurbo(c1, session, turboBias, asianRange(ms(m15), now), null);
     if (!sig.side) return { action: "wait", reason: sig.reason };
     side = sig.side;
     if (adapt.blockSide === side && sig.score < 3) return { action: "wait", reason: `learn: ${adapt.note}` };
