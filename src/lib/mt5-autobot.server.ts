@@ -131,16 +131,17 @@ async function tick() {
     const turboBias: "long" | "short" = t21 > t50 ? "long" : "short";
     // Session engine: Asia bounce / London Asia-range breakout / flexible trend pullback or micro-breakout.
     const swingPos = positions.find((p) => isSwingPos(p));
-    const sig = engineTurbo(c1, session, turboBias, asianRange(ms(m15), now), null);
-    if (!sig.side) return { action: "wait", reason: sig.reason };
-    // 5m structure gate: never trade against a broken 5m structure (user request after the gold dump).
+    let sig: any = engineTurbo(c1, session, turboBias, asianRange(ms(m15), now), null);
     const { m5Gate } = await import("@/lib/m5-structure");
-    const gate = m5Gate(m5rows, sig.side);
-    if (gate) return { action: "wait", reason: gate };
-    // 1H/4H gate: the big trend must not oppose the entry (user request).
     const { htfGate } = await import("@/lib/htf-gate");
-    const hg = htfGate(h1, sig.side);
-    if (hg) return { action: "wait", reason: hg };
+    let blocked = sig.side ? (m5Gate(m5rows, sig.side) ?? htfGate(h1, sig.side)) : sig.reason;
+    // Reversal engine (user rule): firm 5m + 1H = quick scalp; firm 15m body + 4H = strong. Lets the bot flip after a stop.
+    if (blocked) {
+      const { reversalSignal } = await import("@/lib/reversal");
+      const rv = reversalSignal(m5rows, m15, h1);
+      if (!rv) return { action: "wait", reason: blocked };
+      sig = { side: rv.side, slPts: rv.slPts, tpPts: rv.tpPts, score: rv.score, reason: rv.reason, tag: rv.strong ? "REV+" : "REV" };
+    }
     side = sig.side;
     if (adapt.blockSide === side && sig.score < 3) return { action: "wait", reason: `learn: ${adapt.note}` };
     // User SL/TP points stay maximums.
