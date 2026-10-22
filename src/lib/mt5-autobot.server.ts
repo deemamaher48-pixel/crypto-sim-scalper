@@ -8,6 +8,7 @@ import { ptsTag } from "@/lib/mt5-points";
 import { circuitBreaker } from "@/lib/circuit-breaker";
 import { adaptTurbo, outcomesFrom, type Adapt } from "@/lib/turbo-learn";
 import { isSwingPos, swingSignal } from "@/lib/swing";
+import { NEWS, newsPhase } from "@/lib/news-window";
 
 const BLOCK_AR: Record<string, string> = {
   emergency_stop: "⛔ قاطع الطوارئ مفعّل — البوت ما رح يفتح صفقات لحتى تشغّليه",
@@ -104,7 +105,14 @@ async function tick() {
   if (swingTag) { /* swing chosen */ }
   else if (turboOpen) return { action: "manage", results: managed, swing: swingWait };
   else if (strategy === "TURBO_SCALP_1M") {
-    // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
+    // News window: block before/at the release, then max 2 AI-reviewed turbo trades once direction settles.
+    const news = newsPhase(Date.now(), c1);
+    if (news && news.phase !== "post") return { action: "wait", reason: `📰 ${news.phase === "pre" ? "قبل الخبر" : "صدمة الخبر"} — ${news.why}` };
+    if (news) {
+      const { count: nw } = await db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%NW%").neq("status", "cancelled").gte("created_at", new Date(news.start).toISOString());
+      if ((nw ?? 0) >= NEWS.maxTrades) return { action: "wait", reason: "📰 خلصت صفقتين الخبر" };
+    }
+    // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account) — except in the news window.
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
     side = sig.side;
@@ -119,6 +127,13 @@ async function tick() {
     if (strength < adapt.minStrength) return { action: "wait", reason: `learn: ${adapt.note}` };
     lot = dynamicLot(lot, strength); if (strength >= 3) smartWhy += ` | 💪 قوة ${strength}/4`;
     if (adapt.note) smartWhy += ` | 🧠 ${adapt.note}`;
+    if (news) {
+      const k5 = await loadGoldKlines({ interval: "5m" });
+      const r = await aiReviewTrade({ symbol: "XAUUSD", side, price, stop: sb.stop, target: sb.target, signalReason: `NEWS TURBO after ${news.why}: ${sig.reason}. Confirm the post-news direction is real, not a fakeout.`, bars: c1, filter: k5.rows.slice(0, -1), frame: "1m" });
+      if (!r.approve) return { action: "vetoed", reason: `📰 AI رفض صفقة الخبر: ${r.reason}` };
+      ai = r; swingTag = "NW "; lot = Number(ctl.lot ?? AUTO.lot);
+      smartWhy = `📰 تيربو خبر (${news.why}) | AI ${r.confidence}% — ${r.reason}`;
+    }
   } else {
     const k5 = await loadGoldKlines({ interval: "5m" });
     const sig = sniperLiteSignal(c1);
