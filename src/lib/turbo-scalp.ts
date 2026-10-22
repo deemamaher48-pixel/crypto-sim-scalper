@@ -30,12 +30,15 @@ export function turboSignal(c1: Bar[]): TurboSignal | null {
     if (chase === side) return side === "long" ? "منع شراء بالقمة — صعود متمدد، ننتظر تصحيح" : "منع بيع بالقاع — هبوط متمدد، ننتظر تصحيح";
     return null;
   };
+  const cont = (side: Side) => trend !== (side === "long" ? "short" : "long") && chase !== side && !flushAgainst(c1, side) && continuation(c1, e9, side);
   if (bar.close > bar.open && (bar.close >= e9 || bar.close > prev.high) && r >= TURBO.longRsi[0] && r <= TURBO.longRsi[1]) {
     const no = gate("long");
+    if (no && cont("long")) return { side: "long", rsi: r, reason: `تيربو استمرار صعود بعد تصحيح ورفض | RSI ${r.toFixed(1)}` };
     return no ? { side: null, rsi: r, reason: no } : { side: "long", rsi: r, reason: `تيربو شراء مع الترند بعد تصحيح | RSI ${r.toFixed(1)}` };
   }
   if (bar.close < bar.open && (bar.close <= e9 || bar.close < prev.low) && r >= TURBO.shortRsi[0] && r <= TURBO.shortRsi[1]) {
     const no = gate("short");
+    if (no && cont("short")) return { side: "short", rsi: r, reason: `تيربو استمرار هبوط بعد ارتداد ورفض | RSI ${r.toFixed(1)}` };
     return no ? { side: null, rsi: r, reason: no } : { side: "short", rsi: r, reason: `تيربو بيع مع الترند بعد ارتداد | RSI ${r.toFixed(1)}` };
   }
   return { side: null, rsi: r, reason: `مراقبة التذبذب (RSI ${r.toFixed(1)})` };
@@ -79,6 +82,32 @@ export function pulledBack(c1: Bar[], e9: number, side: Side): boolean {
 export function flushAgainst(c1: Bar[], side: Side): boolean {
   const avg = avgRange(c1.slice(0, -3));
   return c1.slice(-3).some((k) => k.high - k.low > 2 * avg && (side === "long" ? k.close < k.open : k.close > k.open));
+}
+
+/**
+ * Trend continuation: a structural leg (≥3×ATR over 20 bars with lower highs+lows for short / higher for long),
+ * price on the trend side of a sloping EMA21, a pullback to EMA9 in the last 4 bars, and a rejection bar that
+ * breaks the previous bar's extreme and closes in its outer third. Catches clean moves the EMA21/50 chop gate misses.
+ */
+export function continuation(c1: Bar[], e9: number, side: Side): boolean {
+  const n = c1.length - 1;
+  if (n < 25) return false;
+  const closes = c1.map((k) => k.close);
+  const a = atr(c1, 14)[n]!, e21 = ema(closes, 21);
+  if (!Number.isFinite(a) || a <= 0) return false;
+  const w = c1.slice(n - 20, n + 1), h1 = w.slice(0, 10), h2 = w.slice(10);
+  const hi = (s: Bar[]) => Math.max(...s.map((k) => k.high)), lo = (s: Bar[]) => Math.min(...s.map((k) => k.low));
+  const bar = c1[n]!, prev = c1[n - 1]!, range = bar.high - bar.low;
+  const pos = range > 0 ? (bar.close - bar.low) / range : 0.5;
+  const d = side === "long" ? 1 : -1;
+  const structure = side === "long" ? hi(h2) > hi(h1) && lo(h2) > lo(h1) : hi(h2) < hi(h1) && lo(h2) < lo(h1);
+  const leg = side === "long" ? bar.close - lo(w) : hi(w) - bar.close;
+  const slope = (e21[n]! - e21[n - 5]!) * d > 0 && (bar.close - e21[n]!) * d > 0;
+  const tol = 0.25 * a, last = c1.slice(n - 4, n);
+  const pull = side === "long" ? Math.min(...last.map((k) => k.low)) <= e9 + tol : Math.max(...last.map((k) => k.high)) >= e9 - tol;
+  const reject = side === "long" ? bar.close > prev.high && pos >= 2 / 3 : bar.close < prev.low && pos <= 1 / 3;
+  const stretched = Math.abs(bar.close - e9) > 1.5 * a;
+  return structure && leg >= 3 * a && slope && pull && reject && !stretched;
 }
 
 export function turboBracket(side: Side, entry: number) {
