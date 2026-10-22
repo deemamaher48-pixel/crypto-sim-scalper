@@ -1,7 +1,6 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
-import { turboBracket, turboSignal, signalStrength, dynamicLot } from "@/lib/turbo-scalp";
-import { smartBracket } from "@/lib/smart-bracket";
+import { asianRange, dailyPivot, engineTurbo, pivotBias, scoreLot, sessionAt } from "@/lib/session-engine";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
@@ -89,12 +88,22 @@ async function tick() {
   let side!: "long" | "short", b!: { stop: number; target: number }, ai!: { confidence: number | string }, smartWhy = "", lot = Number(ctl.lot ?? AUTO.lot);
   let swingTag = "";
   let swingWait = "";
-  if (strategy === "TURBO_SCALP_1M" && !swingOpen && (ctl.swing_enabled ?? true)) {
-    const [k15, kh] = await Promise.all([loadGoldKlines({ interval: "15m" }), loadGoldKlines({ interval: "1h" })]);
-    const m15 = k15.rows.slice(0, -1), h1 = kh.rows.slice(0, -1);
+  // Session + daily pivot compass (TURBO strategy only): buy only above P, sell only below, on the last closed 5m bar.
+  const now = Date.now(), session = sessionAt(now);
+  const ms = (rows: { time: number }[]) => rows.map((k: any) => ({ ...k, time: k.time * 1000 }));
+  let h1: any[] = [], m15: any[] = [], bias: "long" | "short" | null = null, pivot: ReturnType<typeof dailyPivot> = null;
+  if (strategy === "TURBO_SCALP_1M") {
+    const [k15, kh, k5] = await Promise.all([loadGoldKlines({ interval: "15m" }), loadGoldKlines({ interval: "1h" }), loadGoldKlines({ interval: "5m" })]);
+    m15 = k15.rows.slice(0, -1); h1 = kh.rows.slice(0, -1);
+    pivot = dailyPivot(ms(kh.rows), now);
+    const m5 = k5.rows.slice(0, -1);
+    if (pivot && m5.length) bias = pivotBias(m5[m5.length - 1]!.close, pivot);
+  }
+  if (strategy === "TURBO_SCALP_1M" && !swingOpen && (ctl.swing_enabled ?? true) && session !== "NY_LATE" && session !== "ROLLOVER") {
     const sw = swingSignal(m15, h1, price);
     swingWait = sw.reason;
-    if (sw.side) {
+    if (sw.side && bias && sw.side !== bias) swingWait = "سوينغ: البيفوت اليومي عكس الاتجاه";
+    else if (sw.side) {
       const r = await aiReviewTrade({ symbol: "XAUUSD", side: sw.side, price, stop: sw.stop, target: sw.target, signalReason: `SWING 15m/1H: ${sw.reason}`, bars: m15, filter: h1, frame: "15m" });
       if (r.approve) {
         side = sw.side; b = sw; ai = r; swingTag = "SW "; lot = Number(ctl.lot ?? AUTO.lot);
@@ -112,24 +121,24 @@ async function tick() {
       const { count: nw } = await db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%NW%").neq("status", "cancelled").gte("created_at", new Date(news.start).toISOString());
       if ((nw ?? 0) >= NEWS.maxTrades) return { action: "wait", reason: "📰 خلصت صفقتين الخبر" };
     }
-    // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account) — except in the news window.
-    const sig = turboSignal(c1);
-    if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
+    if (!bias) return { action: "wait", reason: "ما في بيفوت يومي جاهز" };
+    // Session engine: Asia pivot bounce / London Asia-range breakout / flexible trend pullback or micro-breakout.
+    const swingPos = positions.find((p) => isSwingPos(p));
+    const sig = engineTurbo(c1, session, bias, asianRange(ms(m15), now), swingPos ? (swingPos.type === "BUY" ? "long" : "short") : null);
+    if (!sig.side) return { action: "wait", reason: sig.reason };
     side = sig.side;
-    if (adapt.blockSide === side) return { action: "wait", reason: `learn: ${adapt.note}` };
-    // Smart bracket: the user's SL/TP points are maximums; real distances come from swings and nearby levels.
-    const fb = turboBracket(side, price);
-    const sb = smartBracket(side, price, c1, Number(ctl.sl_points ?? Math.abs(price - fb.stop)), Number(ctl.tp_points ?? Math.abs(fb.target - price)));
-    if (!sb.ok) return { action: "wait", reason: sb.why };
-    b = sb; smartWhy = sb.why; ai = { confidence: "T" };
-    const rr = Math.abs(sb.target - price) / Math.max(0.01, Math.abs(price - sb.stop));
-    const strength = signalStrength(side, c1, rr);
-    if (strength < adapt.minStrength) return { action: "wait", reason: `learn: ${adapt.note}` };
-    lot = dynamicLot(lot, strength); if (strength >= 3) smartWhy += ` | 💪 قوة ${strength}/4`;
+    if (adapt.blockSide === side && sig.score < 3) return { action: "wait", reason: `learn: ${adapt.note}` };
+    // User SL/TP points stay maximums.
+    const slPts = Math.min(sig.slPts, Number(ctl.sl_points ?? sig.slPts)), tpPts = Math.min(sig.tpPts, Number(ctl.tp_points ?? sig.tpPts));
+    const d = side === "long" ? 1 : -1;
+    b = { stop: price - d * slPts, target: price + d * tpPts };
+    smartWhy = `${sig.reason} | ستوب ${slPts} هدف ${tpPts}`; ai = { confidence: sig.tag };
+    const unsecured = positions.some((p) => !(p.sl > 0 && (p.type === "BUY" ? p.sl >= p.price_open : p.sl <= p.price_open)));
+    lot = scoreLot(lot, sig.score, unsecured); if (sig.score >= 2) smartWhy += ` | 💪 قوة ${sig.score}/3`;
     if (adapt.note) smartWhy += ` | 🧠 ${adapt.note}`;
     if (news) {
       const k5 = await loadGoldKlines({ interval: "5m" });
-      const r = await aiReviewTrade({ symbol: "XAUUSD", side, price, stop: sb.stop, target: sb.target, signalReason: `NEWS TURBO after ${news.why}: ${sig.reason}. Confirm the post-news direction is real, not a fakeout.`, bars: c1, filter: k5.rows.slice(0, -1), frame: "1m" });
+      const r = await aiReviewTrade({ symbol: "XAUUSD", side, price, stop: b.stop, target: b.target, signalReason: `NEWS TURBO after ${news.why}: ${sig.reason}. Confirm the post-news direction is real, not a fakeout.`, bars: c1, filter: k5.rows.slice(0, -1), frame: "1m" });
       if (!r.approve) return { action: "vetoed", reason: `📰 AI رفض صفقة الخبر: ${r.reason}` };
       ai = r; swingTag = "NW "; lot = Number(ctl.lot ?? AUTO.lot);
       smartWhy = `📰 تيربو خبر (${news.why}) | AI ${r.confidence}% — ${r.reason}`;

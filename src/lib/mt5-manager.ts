@@ -11,7 +11,7 @@ export function movePts(p: MgrPos) {
   return p.volume > 0 ? p.profit / (p.volume * MGR.pointValuePerLot) : 0;
 }
 
-export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean, ageSec = Infinity): MgrDecision {
+export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean, ageSec = Infinity, bePts: number = MGR.bePts): MgrDecision {
   const long = p.type === "BUY";
   // Grace period (60s): only exception is a closed bar through EMA21 against us.
   if (ageSec < MGR.graceSec) {
@@ -52,6 +52,10 @@ export function manageDecision(p: MgrPos, bars: MgrBar[], partialDone: boolean, 
   }
   // Partial close (50%) at 80% of target on 0.02+ lots, so the rest can ride the momentum extension.
   if (!partialDone && tpDist > 0 && move >= 0.8 * tpDist && p.volume >= 0.02) return { action: "CLOSE_PARTIAL", reason: "take_half", lot: +(Math.floor(p.volume * 50) / 100).toFixed(2) };
-  if (!secured && move >= MGR.bePts) return { action: "BREAKEVEN", reason: "secure_entry" };
+  // Session-aware secure: at the BE trigger, bank all but 0.01 on 0.02+ lots first, then move SL to entry.
+  if (!secured && move >= bePts) {
+    if (!partialDone && p.volume >= 0.02) return { action: "CLOSE_PARTIAL", reason: "take_half", lot: +(p.volume - 0.01).toFixed(2) };
+    return { action: "BREAKEVEN", reason: "secure_entry" };
+  }
   return { action: "hold", reason: "ok" };
 }
