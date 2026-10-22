@@ -81,6 +81,7 @@ void Trail() {
 datetime lastSnap = 0;
 
 int OnInit() { EventSetMillisecondTimer(100); trade.SetDeviationInPoints(50); return INIT_SUCCEEDED; }
+void OnTick() { OnTimer(); } // also pick up commands on every price tick
 void OnDeinit(const int r) { EventKillTimer(); }
 
 string Get(string &keys[], string &vals[], string k) {

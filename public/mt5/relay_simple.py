@@ -74,7 +74,7 @@ def run_ea(c):
              f"ticket={c.get('ticket') or 0}", f"comment={(c.get('comment') or '')[:25]}"]
     cmd, res = FILES / f"cmd_{cid}.txt", FILES / f"res_{cid}.txt"
     tmp = FILES / f"tmp_{cid}.txt"; tmp.write_text("\n".join(lines) + "\n"); os.replace(tmp, cmd)
-    for _ in range(150):
+    for _ in range(350):  # up to 35s: Wine file I/O on the VPS can lag
         time.sleep(0.1)
         if res.exists():
             kv = dict(l.split("=", 1) for l in res.read_text(errors="ignore").splitlines() if "=" in l)
