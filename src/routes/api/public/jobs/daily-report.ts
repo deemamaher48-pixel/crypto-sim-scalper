@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/public/jobs/daily-report")({
           if (r.action === "BUY" || r.action === "SELL") rows.push({ side: r.action === "BUY" ? "long" : "short", comment: c, bal: Number(/bal:(-?[\d.]+)/.exec(c)?.[1]), exits: [] });
           else if (rows.length && c.startsWith("mgr")) {
             const why = c.split(" ")[3] ?? r.action;
-            rows[rows.length - 1].exits.push(r.action === "BREAKEVEN" ? "BREAKEVEN" : why);
+            rows[rows.length - 1]?.exits.push(r.action === "BREAKEVEN" ? "BREAKEVEN" : why);
           }
         }
         const { entryReason } = await import("@/lib/daily-report");
