@@ -118,7 +118,7 @@ async function tick() {
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
     side = sig.side;
-    if (ch?.bias && ch.bias !== side) return { action: "wait", reason: `📰 الخبر ${ch.bias === "BUY" ? "إيجابي" : "سلبي"} للذهب — ما منعاكس الخبر` };
+    if (ch?.bias && (ch.bias === "BUY" ? "long" : "short") !== side) return { action: "wait", reason: `📰 الخبر ${ch.bias === "BUY" ? "إيجابي" : "سلبي"} للذهب — ما منعاكس الخبر` };
     if (adapt.blockSide === side) return { action: "wait", reason: `learn: ${adapt.note}` };
     // Smart bracket: the user's SL/TP points are maximums; real distances come from swings and nearby levels.
     const fb = turboBracket(side, price);
