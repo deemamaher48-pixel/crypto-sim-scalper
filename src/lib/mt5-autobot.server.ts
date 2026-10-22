@@ -91,12 +91,13 @@ async function tick() {
   // Session + daily pivot compass (TURBO strategy only): buy only above P, sell only below, on the last closed 5m bar.
   const now = Date.now(), session = sessionAt(now);
   const ms = (rows: { time: number }[]) => rows.map((k: any) => ({ ...k, time: k.time * 1000 }));
-  let h1: any[] = [], m15: any[] = [], bias: "long" | "short" | null = null, pivot: ReturnType<typeof dailyPivot> = null;
+  let h1: any[] = [], m15: any[] = [], m5rows: any[] = [], bias: "long" | "short" | null = null, pivot: ReturnType<typeof dailyPivot> = null;
   if (strategy === "TURBO_SCALP_1M") {
     const [k15, kh, k5] = await Promise.all([loadGoldKlines({ interval: "15m" }), loadGoldKlines({ interval: "1h" }), loadGoldKlines({ interval: "5m" })]);
     m15 = k15.rows.slice(0, -1); h1 = kh.rows.slice(0, -1);
     pivot = dailyPivot(ms(kh.rows), now);
     const m5 = k5.rows.slice(0, -1);
+    m5rows = m5;
     if (pivot && m5.length) bias = pivotBias(m5[m5.length - 1]!.close, pivot);
   }
   if (strategy === "TURBO_SCALP_1M" && !swingOpen && (ctl.swing_enabled ?? true) && session !== "NY_LATE" && session !== "ROLLOVER") {
@@ -132,6 +133,10 @@ async function tick() {
     const swingPos = positions.find((p) => isSwingPos(p));
     const sig = engineTurbo(c1, session, turboBias, asianRange(ms(m15), now), null);
     if (!sig.side) return { action: "wait", reason: sig.reason };
+    // 5m structure gate: never trade against a broken 5m structure (user request after the gold dump).
+    const { m5Gate } = await import("@/lib/m5-structure");
+    const gate = m5Gate(m5rows, sig.side);
+    if (gate) return { action: "wait", reason: gate };
     side = sig.side;
     if (adapt.blockSide === side && sig.score < 3) return { action: "wait", reason: `learn: ${adapt.note}` };
     // User SL/TP points stay maximums.
