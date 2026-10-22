@@ -17,6 +17,19 @@ export function firm(bars: Bar[], minBody = 0.6): "long" | "short" | null {
   return null;
 }
 
+/** Wilder RSI of the last close; null when not enough data. */
+export function rsiLast(c: number[], n = 14): number | null {
+  if (c.length <= n) return null;
+  let g = 0, l = 0;
+  for (let i = 1; i <= n; i++) { const d = c[i]! - c[i - 1]!; d > 0 ? (g += d) : (l -= d); }
+  g /= n; l /= n;
+  for (let i = n + 1; i < c.length; i++) {
+    const d = c[i]! - c[i - 1]!;
+    g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n;
+  }
+  return l === 0 ? 100 : 100 - 100 / (1 + g / l);
+}
+
 function tr(bars: { close: number }[], f: number, s: number): "long" | "short" | null {
   const n = bars.length - 1;
   if (n < s) return null;
@@ -28,6 +41,9 @@ export function reversalSignal(m5: Bar[], m15: Bar[], h1: Bar[]): Reversal {
   const side = firm(m5);
   if (!side) return null;
   const opp = side === "long" ? "short" : "long";
+  // Anti-chase: never sell into an extreme oversold low / buy an extreme overbought top.
+  const r = rsiLast(m5.map((k) => k.close), 14);
+  if (r != null && ((side === "short" && r < 25) || (side === "long" && r > 75))) return null;
   const t1 = tr(h1, 21, 50);
   if (t1 === opp) return null; // 5m must agree with (or at least not oppose) 1H
   const t4 = tr(toH4(h1), 9, 21);
