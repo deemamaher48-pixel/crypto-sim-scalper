@@ -36,7 +36,7 @@ export async function mt5AutoTick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
   const r: any = await tick();
   if (r && (r.action === "idle" || r.action === "blocked")) await reportState(db, r.reason);
-  else if (r && r.action !== "wait" || r?.reason !== "entry_in_queue") await reportState(db, null);
+  else await reportState(db, null);
   return r;
 }
 
