@@ -7,12 +7,40 @@ import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
 import { circuitBreaker } from "@/lib/circuit-breaker";
 import { adaptTurbo, outcomesFrom, type Adapt } from "@/lib/turbo-learn";
+import { isSwingPos, swingSignal } from "@/lib/swing";
+
+const BLOCK_AR: Record<string, string> = {
+  emergency_stop: "⛔ قاطع الطوارئ مفعّل — البوت ما رح يفتح صفقات لحتى تشغّليه",
+  rollover: "🌙 وقت التسوية اليومية (2-4 فجراً بالشام) — سبريد عالي، البوت بيرجع لحاله بعدها",
+  daily_limit: "📊 وصلنا الحد اليومي لعدد الصفقات",
+  loss_streak_3: "🛡️ 3 خسائر حقيقية ورا بعض — صمام الأمان وقّف الدخول لحماية الحساب",
+  daily_loss_limit: "🛡️ وصلت خسارة اليوم 20$ — توقف لحماية الحساب لبكرا",
+};
+/** Tell Telegram once whenever the bot's stop reason changes (and once when it resumes). */
+async function reportState(db: any, reason: string | null) {
+  try {
+    const { data } = await db.from("mt5_status").select("payload").eq("id", 2).maybeSingle();
+    const last = data?.payload?.block ?? null;
+    if (last === reason) return;
+    await db.from("mt5_status").upsert({ id: 2, payload: { block: reason }, updated_at: new Date().toISOString() });
+    const { notifyOwners } = await import("@/lib/mt5-telegram.server");
+    await notifyOwners(reason ? `⏸️ البوت وقّف الدخول التلقائي\n${BLOCK_AR[reason] ?? reason}` : "▶️ البوت رجع يدوّر على صفقات تلقائياً");
+  } catch (e) { console.error("reportState", e); }
+}
 
 // Gold auto-bot for the MT5 bridge: strategy signal -> (AI veto for SNIPER) -> queue one BUY/SELL (0.01, SL+TP).
-// MT5 holds SL/TP itself and the EA allows one position, so the cloud only spaces entries out.
+// MT5 holds SL/TP itself; the EA allows two positions (one swing + one turbo).
 export const AUTO = { lot: 0.01, ttlSec: 30, minGapMin: 1, maxPerDay: 200, symbol: "XAUUSD", strategy: "TURBO_SCALP_1M" as "TURBO_SCALP_1M" | "SNIPER_1M" };
 
 export async function mt5AutoTick() {
+  const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
+  const r: any = await tick();
+  if (r && (r.action === "idle" || r.action === "blocked")) await reportState(db, r.reason);
+  else if (r && r.action !== "wait" || r?.reason !== "entry_in_queue") await reportState(db, null);
+  return r;
+}
+
+async function tick() {
   const { supabaseAdmin: db } = await import("@/integrations/supabase/client.server");
   const { data: ctl } = await (db as any).from("mt5_control").select("emergency_stop,strategy,lot,tp_points,sl_points,max_per_day").eq("id", 1).maybeSingle();
   if (!ctl || ctl.emergency_stop) return { action: "idle", reason: "emergency_stop" };
@@ -32,10 +60,16 @@ export async function mt5AutoTick() {
   // Live MT5 snapshot (relay posts every ~20s): don't spam entries while a position is open.
   const { data: st } = await (db as any).from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle();
   const fresh = st?.updated_at && Date.now() - Date.parse(st.updated_at) < 120_000;
-  if (fresh && Array.isArray(st.payload?.positions) && st.payload.positions.length > 0) {
+  const positions: any[] = fresh && Array.isArray(st.payload?.positions) ? st.payload.positions : [];
+  let managed: unknown = undefined;
+  if (positions.length > 0) {
     const { manageOpenPositions } = await import("@/lib/mt5-manager.server");
-    return { action: "manage", results: await manageOpenPositions(db, st.payload.positions, typeof st.payload?.balance === "number" ? st.payload.balance : undefined) };
+    managed = await manageOpenPositions(db, positions, typeof st.payload?.balance === "number" ? st.payload.balance : undefined);
   }
+  // Two slots: one swing + one turbo. SNIPER keeps the old one-position rule.
+  const swingOpen = positions.some((p) => isSwingPos(p));
+  const turboOpen = positions.some((p) => !isSwingPos(p));
+  if (positions.length >= 2 || (strategy !== "TURBO_SCALP_1M" && positions.length > 0)) return { action: "manage", results: managed };
   if ((count ?? 0) >= (ctl.max_per_day ?? AUTO.maxPerDay)) return { action: "blocked", reason: "daily_limit" };
   const bal = typeof st?.payload?.balance === "number" ? st.payload.balance : undefined;
   // Daily circuit breaker: balance at each executed auto entry (bal: tag) gives each trade's real P/L.
@@ -51,8 +85,25 @@ export async function mt5AutoTick() {
   const k1 = await loadGoldKlines({ interval: "1m" });
   const c1 = k1.rows.slice(0, -1);
   const price = k1.rows[k1.rows.length - 1]!.close;
-  let side: "long" | "short", b: { stop: number; target: number }, ai: { confidence: number | string }, smartWhy = "", lot = Number(ctl.lot ?? AUTO.lot);
-  if (strategy === "TURBO_SCALP_1M") {
+  let side!: "long" | "short", b!: { stop: number; target: number }, ai!: { confidence: number | string }, smartWhy = "", lot = Number(ctl.lot ?? AUTO.lot);
+  let swingTag = "";
+  let swingWait = "";
+  if (strategy === "TURBO_SCALP_1M" && !swingOpen && (ctl.swing_enabled ?? true)) {
+    const [k15, kh] = await Promise.all([loadGoldKlines({ interval: "15m" }), loadGoldKlines({ interval: "1h" })]);
+    const m15 = k15.rows.slice(0, -1), h1 = kh.rows.slice(0, -1);
+    const sw = swingSignal(m15, h1, price);
+    swingWait = sw.reason;
+    if (sw.side) {
+      const r = await aiReviewTrade({ symbol: "XAUUSD", side: sw.side, price, stop: sw.stop, target: sw.target, signalReason: `SWING 15m/1H: ${sw.reason}`, bars: m15, filter: h1, frame: "15m" });
+      if (r.approve) {
+        side = sw.side; b = sw; ai = r; swingTag = "SW "; lot = Number(ctl.lot ?? AUTO.lot);
+        smartWhy = `🌊 سوينغ: ${sw.reason} | AI ${r.confidence}% — ${r.reason}`;
+      } else swingWait = `سوينغ رُفض AI: ${r.reason}`;
+    }
+  }
+  if (swingTag) { /* swing chosen */ }
+  else if (turboOpen) return { action: "manage", results: managed, swing: swingWait };
+  else if (strategy === "TURBO_SCALP_1M") {
     // Turbo: quick 2.5-point scalps in chop, no AI veto (user choice on demo account).
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
@@ -82,10 +133,10 @@ export async function mt5AutoTick() {
   const { data, error } = await db.from("mt5_commands").insert({
     action: sig.side === "long" ? "BUY" : "SELL", symbol: AUTO.symbol, lot,
     sl: +b.stop.toFixed(2), tp: +b.target.toFixed(2), status: "pending",
-    comment: `auto ai${ai.confidence} ${ptsTag(price, b)}${bal !== undefined ? ` bal:${bal}` : ""}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
+    comment: `auto ${swingTag}ai${ai.confidence} ${ptsTag(price, b)}${bal !== undefined ? ` bal:${bal}` : ""}`, expires_at: new Date(Date.now() + AUTO.ttlSec * 1000).toISOString(),
   }).select("id").single();
   if (error) throw error;
-  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}${smartWhy ? `\n📐 ${smartWhy}` : ""}`); } catch (e) { console.error("notify", e); }
+  try { const { notifyOwners } = await import("@/lib/mt5-telegram.server"); await notifyOwners(`🤖 البوت فتح صفقة تلقائية\n${side === "long" ? "🟢 شراء" : "🔴 بيع"} ذهب ${lot}\n💵 السعر ≈ ${price.toFixed(2)}\n🎯 الهدف ${b.target.toFixed(2)} | 🛑 الوقف ${b.stop.toFixed(2)}\n🧠 ${swingTag ? "سوينغ + AI" : strategy === "TURBO_SCALP_1M" ? "تيربو" : "قناص + AI"}${smartWhy ? `\n📐 ${smartWhy}` : ""}`); } catch (e) { console.error("notify", e); }
   return { action: "queued", id: data.id, side: sig.side, sl: b.stop, tp: b.target };
 }
 
