@@ -58,10 +58,15 @@ async function handle(u: any) {
     await T.tg('sendMessage', { chat_id: chatId, text: v.text, reply_markup: { inline_keyboard: v.kb } });
   };
 
-  const text: string = msg?.text ?? '';
+  const raw: string = (msg?.text ?? '').trim().replace(/[٠-٩]/g, (c: string) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c)));
+  // Accept "/follow@bot 123", "follow 123" etc.
+  const text = raw.replace(/^\/?(\w+)(@\w+)?/, (_m, c) => `/${String(c).toLowerCase()}`);
   if (msg) {
-    const fid = Number(text.split(/\s+/)[1]);
-    if (text.startsWith('/follow ') && fid) {
+    const fid = Number((text.match(/\d{5,}/) ?? [])[0]);
+    if (text.startsWith('/follow') && !text.startsWith('/followers') && !fid) {
+      return T.tg('sendMessage', { chat_id: chatId, text: 'اكتب الأمر مع الرقم:\n/follow 123456789' });
+    }
+    if (text.startsWith('/follow') && !text.startsWith('/followers') && fid) {
       await db.from('tg_followers').upsert({ chat_id: fid });
       return T.tg('sendMessage', { chat_id: chatId, text: `✅ انضاف ${fid} — رح توصله إشعارات دخول الصفقات فقط\n(لازم يكون ضاغط Start بالبوت)` });
     }
