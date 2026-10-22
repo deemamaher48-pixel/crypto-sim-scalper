@@ -74,12 +74,15 @@ async function tick() {
   const bal = typeof st?.payload?.balance === "number" ? st.payload.balance : undefined;
   // Daily circuit breaker: balance at each executed auto entry (bal: tag) gives each trade's real P/L.
   let adapt: Adapt = { blockSide: null, minStrength: 0, note: "" };
+  let lastPnl: number | undefined;
   if (bal !== undefined) {
     const { data: done } = await db.from("mt5_commands").select("action,comment").in("action", ["BUY", "SELL"]).like("comment", "auto%").eq("status", "executed").gte("created_at", day.toISOString()).order("created_at", { ascending: true });
     const entries = (done ?? []).map((r: any) => ({ side: (r.action === "BUY" ? "long" : "short") as "long" | "short", bal: Number(/bal:(-?[\d.]+)/.exec(r.comment ?? "")?.[1]) })).filter((e: any) => Number.isFinite(e.bal));
     const cb = circuitBreaker([...entries.map((e: any) => e.bal), bal]);
     if (cb) return { action: "blocked", reason: cb };
-    adapt = adaptTurbo(outcomesFrom(entries, bal));
+    const outs = outcomesFrom(entries, bal);
+    adapt = adaptTurbo(outs);
+    lastPnl = outs.at(-1)?.pnl;
   }
 
   const k1 = await loadGoldKlines({ interval: "1m" });
@@ -134,7 +137,9 @@ async function tick() {
     let sig: any = engineTurbo(c1, session, turboBias, asianRange(ms(m15), now), null);
     const { m5Gate } = await import("@/lib/m5-structure");
     const { htfGate } = await import("@/lib/htf-gate");
-    let blocked = sig.side ? (m5Gate(m5rows, sig.side) ?? htfGate(h1, sig.side)) : sig.reason;
+    const { needsHeavyGate } = await import("@/lib/heavy-gate");
+    const heavy = sig.side ? needsHeavyGate(lastPnl, m5rows, sig.side) : false;
+    let blocked = sig.side ? (heavy ? (m5Gate(m5rows, sig.side) ?? htfGate(h1, sig.side)) : null) : sig.reason;
     // Reversal engine (user rule): firm 5m + 1H = quick scalp; firm 15m body + 4H = strong. Lets the bot flip after a stop.
     if (blocked) {
       const { reversalSignal } = await import("@/lib/reversal");
