@@ -16,3 +16,6 @@
 - [x] 1m Sniper scalping toggle (fast breakeven, 3-bar time stop, circuit breaker; re-enable clears cooldown)
 - [x] Sniper toggle lives in the bot card under the run switch; chart switches to 1m while it is on
 - [x] أولوية الإغلاق/التأمين ومنع تداخل الأوامر (يحتاج تحديث Relay عند نبراس)
+- [ ] فك حظر صمام الأمان وتجاهل خروجات السنتات
+- [ ] محرك سوينغ 15د/1س مع صفقتين معاً (سوينغ + تيربو)
+- [ ] رسالة تيليجرام تشرح سبب توقف البوت (مرة عند كل تغيّر)
