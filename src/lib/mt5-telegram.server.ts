@@ -23,32 +23,30 @@ async function control() {
 export async function mt5Panel(note?: string): Promise<{ text: string; kb: Kb }> {
   const d = await db();
   const day = new Date(); day.setUTCHours(0, 0, 0, 0);
-  const [c, { data: st }, { data: cmds }, { count }] = await Promise.all([
+  const [c, { data: st }, { data: cmds }, { count }, { data: first }] = await Promise.all([
     control(),
     d.from("mt5_status").select("payload,updated_at").eq("id", 1).maybeSingle(),
-    d.from("mt5_commands").select("action,status,lot,sl,tp,ticket,result,created_at").order("created_at", { ascending: false }).limit(5),
+    d.from("mt5_commands").select("action,status,lot,ticket,result,created_at").eq("status", "executed").order("created_at", { ascending: false }).limit(4),
     d.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).eq("status", "executed").gte("created_at", day.toISOString()),
+    d.from("mt5_commands").select("comment").like("comment", "%bal:%").gte("created_at", day.toISOString()).order("created_at", { ascending: true }).limit(1),
   ]);
   const p = st?.payload ?? {};
   const pos: any[] = Array.isArray(p.positions) ? p.positions : [];
-  const posLines = pos.map((x) => `• ${x.type === "BUY" ? "🟢 شراء" : "🔴 بيع"} ${x.volume} @ ${x.price_open} | #${x.ticket} | ${Number(x.profit) >= 0 ? "+" : ""}${x.profit}$`).join("\n") || "• لا يوجد";
-  const lines = (cmds ?? []).map((x: any) => {
-    const t = x.result?.ticket ?? x.ticket;
-    return `• ${String(x.created_at).slice(11, 16)} ${ACT_AR[x.action] ?? x.action}${x.lot ? ` ${x.lot}` : ""} — ${STATUS_AR[x.status] ?? x.status}${t ? ` #${t}` : ""}${x.result?.error ? `\n   ↳ ${x.result.error}` : ""}`;
-  }).join("\n") || "• لا يوجد";
+  const posLines = pos.map((x) => `${x.type === "BUY" ? "🟢 شراء" : "🔴 بيع"} ${x.volume} @ ${x.price_open}  ${Number(x.profit) >= 0 ? "🟢 +" : "🔴 "}${x.profit}$`).join("\n") || "لا يوجد — بانتظار فرصة";
+  // Clean history: only executed commands, no technical errors or failed retries.
+  const lines = (cmds ?? []).map((x: any) => `${String(x.created_at).slice(11, 16)}  ${ACT_AR[x.action] ?? x.action}${x.lot && ["BUY", "SELL"].includes(x.action) ? ` ${x.lot}` : ""}`).join("\n") || "لا يوجد";
+  const startBal = Number(/bal:(-?[\d.]+)/.exec(first?.[0]?.comment ?? "")?.[1]);
+  const dayPl = p.balance != null && Number.isFinite(startBal) ? +(Number(p.balance) - startBal).toFixed(2) : null;
   const age = st?.updated_at ? Math.round((Date.now() - Date.parse(st.updated_at)) / 1000) : null;
   const text = [
-    "🥇 لوحة تداول الذهب — MT5 (Inzo)",
+    `🥇 ذهب MT5  ${c.emergency_stop ? "⏸️ متوقف" : "🟢 شغّال"}  ${age != null && age < 120 ? "📡 متصل" : "🟠 غير متصل"}`,
     "━━━━━━━━━━━━━━",
-    `🤖 البوت: ${c.emergency_stop ? "🔴 متوقف" : "🟢 شغّال"}`,
-    `🧠 الاستراتيجية: ${c.strategy === "TURBO_SCALP_1M" ? "⚡ تيربو سريع" : "🎯 قناص + ذكاء اصطناعي"}`,
-    `📦 اللوت: ${c.lot} | 🎯 الهدف: ${c.tp_points} نقطة | 🛑 الوقف: ${c.sl_points} نقطة`,
-    `📅 صفقات اليوم: ${count ?? 0} / ${c.max_per_day}`,
+    p.balance != null ? `💰 ${p.balance}$${dayPl != null ? `   اليوم: ${dayPl >= 0 ? "🟢 +" : "🔴 "}${dayPl}$` : ""}` : "💰 الرصيد غير متوفر",
+    `${c.strategy === "TURBO_SCALP_1M" ? "⚡ تيربو ذكي" : "🎯 قناص + AI"}  |  لوت ${c.lot}  |  🎯${c.tp_points} 🛑${c.sl_points}`,
+    `📅 صفقات اليوم: ${count ?? 0}`,
     "━━━━━━━━━━━━━━",
-    p.balance != null ? `💰 الرصيد: ${p.balance}$ | الصافي: ${p.equity}$` : "💰 الرصيد: غير متوفر",
-    age != null ? `📡 اتصال MT5: ${age < 120 ? "🟢 متصل" : `🟠 آخر تحديث قبل ${Math.round(age / 60)} دقيقة`}` : "📡 اتصال MT5: ⚪ غير معروف",
-    "", "📊 الصفقات المفتوحة:", posLines,
-    "", "🧾 آخر الأوامر:", lines,
+    "📊 مفتوحة:", posLines,
+    "", "🧾 آخر العمليات:", lines,
     note ? `\n📝 ${note}` : "",
   ].join("\n");
   const kb: Kb = [
