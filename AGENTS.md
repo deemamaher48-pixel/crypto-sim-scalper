@@ -10,8 +10,8 @@
 <!-- LOVABLE:END -->
 
 # Agent rules
-- Trade history is never truncated on insert; account reads paginate until exhausted, and src/lib/trade-history.ts shares outcome presentation — keeps records complete and labels consistent without changing execution reasons.
-- Pure trading logic (indicators, signals, risk) lives in src/lib/trading.ts with tests; server code imports it — keeps rules testable and shared with the UI.
+- Trade history is never truncated on insert; account reads paginate until exhausted, and src/lib/trade-history.ts shares outcome presentation.
+- Pure trading logic (indicators, signals, risk) lives in src/lib/trading.ts with tests; server code imports it.
 - Bot execution runs in authenticated server functions (src/functions/bot.functions.ts) — workers are stateless, no in-memory bot state.
 - Chart and paper-mode prices come from the live Binance public API (Testnet mode decides on Testnet prices to match its fills); paper balances live in bot_settings — user wants real prices with simulated trading.
 - API credentials table has no client grants; only server functions read it via admin client — secrets never reach the browser.
@@ -27,8 +27,9 @@
 - TURBO self-learning lives in pure src/lib/turbo-learn.ts: today's real bot outcomes (bal: tags) pause a side after 2 straight losses and demand stronger signals on a poor win rate; manual/Telegram trades (non-"auto" comments) and bot trades overlapping them are excluded from learning, the breaker and the heavy gate — user tests must not teach the bot.
 - MT5 runs two slots: one SWING (pure src/lib/swing.ts: 1H EMA50/200 trend + 15m BOS/EMA21 pullback, AI-approved, comment "auto SW") and one TURBO; swing positions (stop ≥3.5 pts) get their own management and EA trail — turbo rules would cut swings early.
 - Circuit breaker counts losses ≥ $1.5; stop reason posts to Telegram once per change (mt5_status id=2) — user always knows why.
-- News window (news-window.ts) is off in mt5-autobot (NEWS_GUARD=false, user choice).
+- news-window.ts is off in mt5-autobot (NEWS_GUARD=false, user choice).
 - TURBO 5m-structure (m5-structure.ts) and 1H/4H (htf-gate.ts) gates apply only after a stop loss or against firm opposite 5m momentum (pure src/lib/heavy-gate.ts) — user rule: no permanent freeze.
 - MT5 TURBO entries come from the session engine (pure src/lib/session-engine.ts): UTC sessions, direction from the 1m EMA21/50 trend (daily pivot no longer gates turbo, user choice; swing still uses it), Asia-range breakout at London open, flexible EMA9/21 pullback or micro-breakout; score sets lot (max 0.03, base while another trade is unsecured) and turbo break-even is session-aware — replaces the old turboSignal/smart-bracket gate for entries.
 - MT5 TURBO reversal engine (pure src/lib/reversal.ts): when the normal turbo entry is blocked, a firm 5m candle not opposed by 1H opens a quick scalp, plus a firm 15m body not opposed by 4H a stronger one — lets the bot flip after a stop instead of idling; skips extreme 5m RSI (<25 sell, >75 buy) only.
-- Nightly Telegram report: pure daily-report.ts via /api/public/jobs/daily-report (21:00 UTC schedule).
+- Nightly Telegram report: pure daily-report.ts via /api/public/jobs/daily-report (21:00 UTC).
+- Nightly report P&L per trade uses EA snapshot "deals" (broker net per ticket, pure buildReportTrades), else balance-diff estimate — broker is truth.

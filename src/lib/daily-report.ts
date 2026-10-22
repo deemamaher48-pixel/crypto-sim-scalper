@@ -21,6 +21,36 @@ export function tradeReason(t: ReportTrade): string {
   return `${t.side === "long" ? "شراء" : "بيع"} — ${t.entry ?? "إشارة تيربو"} ← ${end}`;
 }
 
+export type ReportCmd = { action: string; comment: string | null; ticket?: number | null };
+export type BrokerDeal = { ticket: number; profit: number };
+
+/** Builds report trades: real broker profit per ticket when the EA reports deals, else balance-diff estimate. */
+export function buildReportTrades(cmds: ReportCmd[], deals: BrokerDeal[] | null, endBal: number | null): { trades: ReportTrade[]; start: number | null; exact: boolean } {
+  const byTk = new Map((deals ?? []).map((d) => [Number(d.ticket), Number(d.profit)]));
+  const rows: { side: "long" | "short"; comment: string; bal: number; ticket: number; exits: string[] }[] = [];
+  for (const r of cmds) {
+    const c = String(r.comment ?? "");
+    if (r.action === "BUY" || r.action === "SELL") { rows.push({ side: r.action === "BUY" ? "long" : "short", comment: c, bal: Number(/bal:(-?[\d.]+)/.exec(c)?.[1]), ticket: Number(r.ticket) || 0, exits: [] }); continue; }
+    if (!c.startsWith("mgr")) continue;
+    const [, tk, act, why] = c.split(" ");
+    const tag = r.action === "BREAKEVEN" ? "BREAKEVEN" : (why ?? act ?? r.action);
+    const own = rows.find((x) => x.ticket > 0 && x.ticket === Number(tk)) ?? rows[rows.length - 1];
+    own?.exits.push(tag);
+  }
+  const exact = byTk.size > 0;
+  const trades: ReportTrade[] = rows.map((r, i) => {
+    const next = rows.slice(i + 1).find((x) => Number.isFinite(x.bal))?.bal ?? endBal;
+    const est = Number.isFinite(r.bal) && next != null ? +(next - r.bal).toFixed(2) : 0;
+    const real = byTk.get(r.ticket);
+    return { side: r.side, pnl: real != null ? +real.toFixed(2) : est, swing: r.comment.startsWith("auto SW"), manual: !r.comment.startsWith("auto"), entry: entryReason(r.comment), exits: [...new Set(r.exits)] };
+  });
+  // Positions opened directly in MT5 (no queued command) count as manual.
+  const known = new Set(rows.map((r) => r.ticket));
+  for (const [tk, p] of byTk) if (!known.has(tk)) trades.push({ side: "long", pnl: +p.toFixed(2), swing: false, manual: true });
+  const start = rows.find((r) => Number.isFinite(r.bal))?.bal ?? endBal;
+  return { trades, start, exact };
+}
+
 export function dailyReport(trades: ReportTrade[], startBal: number | null, endBal: number | null): string {
   const bot = trades.filter((t) => !t.manual);
   const wins = bot.filter((t) => t.pnl > 0), losses = bot.filter((t) => t.pnl < 0);
