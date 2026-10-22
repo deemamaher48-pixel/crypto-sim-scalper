@@ -137,6 +137,10 @@ async function tick() {
     const { m5Gate } = await import("@/lib/m5-structure");
     const gate = m5Gate(m5rows, sig.side);
     if (gate) return { action: "wait", reason: gate };
+    // 1H/4H gate: the big trend must not oppose the entry (user request).
+    const { htfGate } = await import("@/lib/htf-gate");
+    const hg = htfGate(h1, sig.side);
+    if (hg) return { action: "wait", reason: hg };
     side = sig.side;
     if (adapt.blockSide === side && sig.score < 3) return { action: "wait", reason: `learn: ${adapt.note}` };
     // User SL/TP points stay maximums.
