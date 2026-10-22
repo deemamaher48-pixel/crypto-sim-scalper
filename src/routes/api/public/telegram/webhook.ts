@@ -70,7 +70,7 @@ async function handle(u: any) {
       await db.from('tg_followers').upsert({ chat_id: fid });
       return T.tg('sendMessage', { chat_id: chatId, text: `✅ انضاف ${fid} — رح توصله إشعارات دخول الصفقات فقط\n(لازم يكون ضاغط Start بالبوت)` });
     }
-    if (text.startsWith('/unfollow ') && fid) {
+    if (text.startsWith('/unfollow') && fid) {
       await db.from('tg_followers').delete().eq('chat_id', fid);
       return T.tg('sendMessage', { chat_id: chatId, text: `🗑️ انشال ${fid} من الإشعارات` });
     }
