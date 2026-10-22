@@ -28,4 +28,4 @@
 - MT5 runs two slots: one SWING (pure src/lib/swing.ts: 1H EMA50/200 trend + 15m BOS/EMA21 pullback, AI-approved, comment "auto SW") and one TURBO; swing positions (stop ≥3.5 pts) get their own management and EA trail — turbo rules would cut swings early.
 - Circuit breaker only counts losses ≥ $1.5; the bot posts its stop reason to Telegram once per change (state kept in mt5_status id=2) — the user should never have to ask why it stopped.
 - News window: block before/at release; max 2 AI-reviewed turbo trades after, via pure src/lib/news-window.ts (scheduled UTC times + live 1m spike) — keeps news rules testable.
-- High-impact news also comes from the user's news channel public page (t.me/s/fxdiab) via pure src/lib/channel-news.ts: shock blocks entries, post-news turbo only trades with the post's gold direction — a bot never receives its own channel posts as updates, so we read the public page.
+- News gating uses only the fixed schedule and live 1m price spikes (src/lib/news-window.ts); channel text is not read — user wants decisions from price action only.
