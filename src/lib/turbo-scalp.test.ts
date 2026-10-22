@@ -39,7 +39,7 @@ _it("catches a sell continuation after a pullback in a falling leg", () => {
   const b = (o: number, c: number, h: number, l: number, t: number) => ({ time: t, open: o, close: c, high: h, low: l, volume: 1 });
   const bars = Array.from({ length: 40 }, (_, i) => b(4100 - i * 0.4, 4099.7 - i * 0.4, 4100.2 - i * 0.4, 4099.5 - i * 0.4, i));
   bars.push(b(4084.1, 4084.9, 4085.2, 4084, 40), b(4084.9, 4085.3, 4085.6, 4084.8, 41));
-  bars.push(b(4085.2, 4083.9, 4085.3, 4083.8, 42));
+  bars.push(b(4085.2, 4084.4, 4085.3, 4084.3, 42));
   const e9 = ema(bars.map((k) => k.close), 9).at(-1)!;
   _ex(continuation(bars, e9, "short")).toBe(true);
   _ex(continuation(bars, e9, "long")).toBe(false);
