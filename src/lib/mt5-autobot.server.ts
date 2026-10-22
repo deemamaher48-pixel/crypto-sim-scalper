@@ -9,7 +9,6 @@ import { circuitBreaker } from "@/lib/circuit-breaker";
 import { adaptTurbo, outcomesFrom, type Adapt } from "@/lib/turbo-learn";
 import { isSwingPos, swingSignal } from "@/lib/swing";
 import { NEWS, newsPhase } from "@/lib/news-window";
-import { channelPhase, fetchChannelPosts } from "@/lib/channel-news";
 
 const BLOCK_AR: Record<string, string> = {
   emergency_stop: "⛔ قاطع الطوارئ مفعّل — البوت ما رح يفتح صفقات لحتى تشغّليه",
@@ -107,8 +106,7 @@ async function tick() {
   else if (turboOpen) return { action: "manage", results: managed, swing: swingWait };
   else if (strategy === "TURBO_SCALP_1M") {
     // News window: block before/at the release, then max 2 AI-reviewed turbo trades once direction settles.
-    const ch = channelPhase(await fetchChannelPosts(), Date.now());
-    const news = ch ?? newsPhase(Date.now(), c1);
+    const news = newsPhase(Date.now(), c1);
     if (news && news.phase !== "post") return { action: "wait", reason: `📰 ${news.phase === "pre" ? "قبل الخبر" : "صدمة الخبر"} — ${news.why}` };
     if (news) {
       const { count: nw } = await db.from("mt5_commands").select("id", { count: "exact", head: true }).in("action", ["BUY", "SELL"]).like("comment", "auto%NW%").neq("status", "cancelled").gte("created_at", new Date(news.start).toISOString());
@@ -118,7 +116,6 @@ async function tick() {
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
     side = sig.side;
-    if (ch?.bias && (ch.bias === "BUY" ? "long" : "short") !== side) return { action: "wait", reason: `📰 الخبر ${ch.bias === "BUY" ? "إيجابي" : "سلبي"} للذهب — ما منعاكس الخبر` };
     if (adapt.blockSide === side) return { action: "wait", reason: `learn: ${adapt.note}` };
     // Smart bracket: the user's SL/TP points are maximums; real distances come from swings and nearby levels.
     const fb = turboBracket(side, price);
