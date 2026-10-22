@@ -5,7 +5,7 @@ import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
 import { circuitBreaker } from "@/lib/circuit-breaker";
-import { adaptTurbo, outcomesFrom, type Adapt } from "@/lib/turbo-learn";
+import { adaptTurbo, botBalances, outcomesFrom, type Adapt } from "@/lib/turbo-learn";
 import { isSwingPos, swingSignal } from "@/lib/swing";
 import { NEWS, newsPhase } from "@/lib/news-window";
 
@@ -76,11 +76,16 @@ async function tick() {
   let adapt: Adapt = { blockSide: null, minStrength: 0, note: "" };
   let lastPnl: number | undefined;
   if (bal !== undefined) {
-    const { data: done } = await db.from("mt5_commands").select("action,comment").in("action", ["BUY", "SELL"]).like("comment", "auto%").eq("status", "executed").gte("created_at", day.toISOString()).order("created_at", { ascending: true });
-    const entries = (done ?? []).map((r: any) => ({ side: (r.action === "BUY" ? "long" : "short") as "long" | "short", bal: Number(/bal:(-?[\d.]+)/.exec(r.comment ?? "")?.[1]) })).filter((e: any) => Number.isFinite(e.bal));
-    const cb = circuitBreaker([...entries.map((e: any) => e.bal), bal]);
-    if (cb) return { action: "blocked", reason: cb };
+    // All executed entries today; manual/Telegram test trades are marked so learning and the breaker ignore them.
+    const { data: done } = await db.from("mt5_commands").select("action,comment").in("action", ["BUY", "SELL"]).eq("status", "executed").gte("created_at", day.toISOString()).order("created_at", { ascending: true });
+    const entries = (done ?? []).map((r: any) => {
+      const manual = !String(r.comment ?? "").startsWith("auto");
+      return { side: (r.action === "BUY" ? "long" : "short") as "long" | "short", bal: manual ? 0 : Number(/bal:(-?[\d.]+)/.exec(r.comment ?? "")?.[1]), manual };
+    }).filter((e: any) => e.manual || Number.isFinite(e.bal));
     const outs = outcomesFrom(entries, bal);
+    const firstBot = entries.find((e: any) => !e.manual);
+    const cb = firstBot ? circuitBreaker(botBalances(firstBot.bal, outs)) : null;
+    if (cb) return { action: "blocked", reason: cb };
     adapt = adaptTurbo(outs);
     lastPnl = outs.at(-1)?.pnl;
   }
