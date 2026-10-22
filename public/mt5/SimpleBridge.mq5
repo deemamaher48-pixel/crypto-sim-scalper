@@ -112,6 +112,31 @@ int CountOn(string sym) {
    return n;
 }
 
+// Today's closed positions with real broker net profit (profit + commission + swap), keyed by position id.
+string DealsJson() {
+   datetime now = TimeCurrent(), from = now - (now % 86400);
+   if (!HistorySelect(from, now + 60)) return "";
+   ulong ids[]; double pl[]; bool closed[];
+   for (int i = 0; i < HistoryDealsTotal(); i++) {
+      ulong d = HistoryDealGetTicket(i); if (d == 0) continue;
+      long e = HistoryDealGetInteger(d, DEAL_ENTRY);
+      long t = HistoryDealGetInteger(d, DEAL_TYPE);
+      if (t != DEAL_TYPE_BUY && t != DEAL_TYPE_SELL) continue;
+      ulong p = (ulong)HistoryDealGetInteger(d, DEAL_POSITION_ID);
+      int k = -1; for (int j = 0; j < ArraySize(ids); j++) if (ids[j] == p) { k = j; break; }
+      if (k < 0) { k = ArraySize(ids); if (k >= 100) continue; ArrayResize(ids, k + 1); ArrayResize(pl, k + 1); ArrayResize(closed, k + 1); ids[k] = p; pl[k] = 0; closed[k] = false; }
+      pl[k] += HistoryDealGetDouble(d, DEAL_COMMISSION) + HistoryDealGetDouble(d, DEAL_SWAP);
+      if (e == DEAL_ENTRY_OUT || e == DEAL_ENTRY_OUT_BY) { pl[k] += HistoryDealGetDouble(d, DEAL_PROFIT); closed[k] = true; }
+   }
+   string out = "";
+   for (int j = 0; j < ArraySize(ids); j++) {
+      if (!closed[j] || PositionSelectByTicket(ids[j])) continue;
+      if (out != "") out += ",";
+      out += "{\"ticket\":" + IntegerToString((long)ids[j]) + ",\"profit\":" + DoubleToString(pl[j], 2) + "}";
+   }
+   return out;
+}
+
 void WriteSnapshot() {
    string pos = "";
    for (int i = 0; i < PositionsTotal(); i++) {
@@ -128,7 +153,7 @@ void WriteSnapshot() {
    string js = "{\"connected\":true,\"balance\":" + DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2) +
                ",\"equity\":" + DoubleToString(AccountInfoDouble(ACCOUNT_EQUITY), 2) +
                ",\"free_margin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 2) +
-               ",\"positions\":[" + pos + "]}";
+               ",\"positions\":[" + pos + "],\"deals\":[" + DealsJson() + "]}";
    int h = FileOpen("snapshot.tmp", FILE_WRITE | FILE_TXT | FILE_ANSI | FILE_COMMON);
    if (h == INVALID_HANDLE) return;
    FileWriteString(h, js); FileClose(h);
