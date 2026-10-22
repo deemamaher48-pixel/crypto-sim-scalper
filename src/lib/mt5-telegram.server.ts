@@ -131,3 +131,10 @@ export async function notifyOwners(text: string) {
   const { tg } = await import("@/lib/telegram.server");
   for (const r of data ?? []) await tg("sendMessage", { chat_id: Number(r.chat_id), text, reply_markup: { inline_keyboard: [[{ text: "❌ إغلاق الكل", callback_data: "mt5:closeall" }, { text: "🥇 اللوحة", callback_data: "mt5" }]] } });
 }
+
+/** Read-only followers: entry alerts only, no buttons, no control. */
+export async function notifyFollowers(text: string) {
+  const { data } = await (await db()).from("tg_followers").select("chat_id");
+  const { tg } = await import("@/lib/telegram.server");
+  for (const r of data ?? []) { try { await tg("sendMessage", { chat_id: Number(r.chat_id), text }); } catch (e) { console.error("follower", e); } }
+}

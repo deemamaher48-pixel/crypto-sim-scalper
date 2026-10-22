@@ -60,6 +60,19 @@ async function handle(u: any) {
 
   const text: string = msg?.text ?? '';
   if (msg) {
+    const fid = Number(text.split(/\s+/)[1]);
+    if (text.startsWith('/follow ') && fid) {
+      await db.from('tg_followers').upsert({ chat_id: fid });
+      return T.tg('sendMessage', { chat_id: chatId, text: `✅ انضاف ${fid} — رح توصله إشعارات دخول الصفقات فقط\n(لازم يكون ضاغط Start بالبوت)` });
+    }
+    if (text.startsWith('/unfollow ') && fid) {
+      await db.from('tg_followers').delete().eq('chat_id', fid);
+      return T.tg('sendMessage', { chat_id: chatId, text: `🗑️ انشال ${fid} من الإشعارات` });
+    }
+    if (text.startsWith('/followers')) {
+      const { data: f } = await db.from('tg_followers').select('chat_id');
+      return T.tg('sendMessage', { chat_id: chatId, text: `👥 المتابعين (${f?.length ?? 0}):\n${(f ?? []).map((r: any) => r.chat_id).join('\n') || '—'}\n\nإضافة: /follow ID\nحذف: /unfollow ID` });
+    }
     if (text.startsWith('/key')) {
       const days = Math.min(365, Math.max(1, Number(text.split(/\s+/)[1]) || 30));
       const code = `VIP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
