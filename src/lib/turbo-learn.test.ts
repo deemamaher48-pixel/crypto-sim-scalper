@@ -11,7 +11,7 @@ it("keeps a side open if its last trade won", () => {
   expect(adaptTurbo([{ side: "long", pnl: -2 }, { side: "long", pnl: 2 }]).blockSide).toBeNull();
 });
 it("demands strength 3 when win rate is under 40%", () => {
-  expect(adaptTurbo([{ side: "long", pnl: -2 }, { side: "short", pnl: -2 }, { side: "long", pnl: 1 }, { side: "short", pnl: -2 }]).minStrength).toBe(3);
+  expect(adaptTurbo([{ side: "long", pnl: -2 }, { side: "short", pnl: -2 }, { side: "long", pnl: 2 }, { side: "short", pnl: -2 }, { side: "long", pnl: -2 }]).minStrength).toBe(3);
 });
 it("normal rules when winning", () => {
   expect(adaptTurbo([{ side: "short", pnl: 1 }, { side: "short", pnl: 2 }, { side: "long", pnl: -2 }, { side: "short", pnl: 3 }]).minStrength).toBe(0);
