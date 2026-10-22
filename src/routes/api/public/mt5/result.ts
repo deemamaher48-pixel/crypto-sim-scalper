@@ -26,10 +26,15 @@ export const Route = createFileRoute("/api/public/mt5/result")({
         const now = new Date().toISOString();
         const { data, error } = await db.from("mt5_commands")
           .update({ status: r.success ? "executed" : "failed", result: r, reported_at: now, updated_at: now })
-          .eq("id", r.command_id).in("status", ["pending", "leased"]).select("id,action,ticket,comment");
+          .eq("id", r.command_id).in("status", ["pending", "leased"]).select("id,action,ticket,comment,lot,symbol");
         if (error) { console.error("result save", error); return Response.json({ error: "save_failed" }, { status: 500 }); }
         if (data?.length) {
           const c: any = data[0];
+          if (r.success && (c.action === "BUY" || c.action === "SELL")) {
+            const side = c.action === "BUY" ? "🟢 شراء" : "🔴 بيع";
+            const msg = `📢 دخلنا صفقة جديدة\n${side} ${c.symbol ?? "XAUUSD"}\n📦 اللوت: ${c.lot ?? "-"}${r.price ? `\n💲 سعر الدخول: ${r.price}` : ""}`;
+            try { const { notifyFollowers } = await import("@/lib/mt5-telegram.server"); await notifyFollowers(msg); } catch (e) { console.error("followers", e); }
+          }
           // Success is NOT announced here: the relay's ack can lie. verifyProtective() confirms from the live broker snapshot.
           if (!r.success && (String(c.comment ?? "").startsWith("mgr ") || String(c.comment ?? "").startsWith("telegram "))) {
             const name: Record<string, string> = { CLOSE: "الإغلاق", CLOSE_PARTIAL: "الإغلاق الجزئي", BREAKEVEN: "التأمين" };

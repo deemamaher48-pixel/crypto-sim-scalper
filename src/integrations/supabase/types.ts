@@ -284,6 +284,21 @@ export type Database = {
         }
         Relationships: []
       }
+      tg_followers: {
+        Row: {
+          chat_id: number
+          created_at: string
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       tg_license_keys: {
         Row: {
           code: string
