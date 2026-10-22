@@ -78,6 +78,13 @@
       "when": 1792659971911,
       "tag": "0010_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792693481928,
+      "tag": "0011_expire_pending_as_cancelled",
+      "breakpoints": true
     }
   ]
 }
