@@ -6,6 +6,7 @@ import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
 import { circuitBreaker } from "@/lib/circuit-breaker";
+import { adaptTurbo, outcomesFrom, type Adapt } from "@/lib/turbo-learn";
 
 // Gold auto-bot for the MT5 bridge: strategy signal -> (AI veto for SNIPER) -> queue one BUY/SELL (0.01, SL+TP).
 // MT5 holds SL/TP itself and the EA allows one position, so the cloud only spaces entries out.
@@ -38,11 +39,13 @@ export async function mt5AutoTick() {
   if ((count ?? 0) >= (ctl.max_per_day ?? AUTO.maxPerDay)) return { action: "blocked", reason: "daily_limit" };
   const bal = typeof st?.payload?.balance === "number" ? st.payload.balance : undefined;
   // Daily circuit breaker: balance at each executed auto entry (bal: tag) gives each trade's real P/L.
+  let adapt: Adapt = { blockSide: null, minStrength: 0, note: "" };
   if (bal !== undefined) {
-    const { data: done } = await db.from("mt5_commands").select("comment").in("action", ["BUY", "SELL"]).like("comment", "auto%").eq("status", "executed").gte("created_at", day.toISOString()).order("created_at", { ascending: true });
-    const bals = (done ?? []).map((r: any) => Number(/bal:(-?[\d.]+)/.exec(r.comment ?? "")?.[1])).filter(Number.isFinite);
-    const cb = circuitBreaker([...bals, bal]);
+    const { data: done } = await db.from("mt5_commands").select("action,comment").in("action", ["BUY", "SELL"]).like("comment", "auto%").eq("status", "executed").gte("created_at", day.toISOString()).order("created_at", { ascending: true });
+    const entries = (done ?? []).map((r: any) => ({ side: (r.action === "BUY" ? "long" : "short") as "long" | "short", bal: Number(/bal:(-?[\d.]+)/.exec(r.comment ?? "")?.[1]) })).filter((e: any) => Number.isFinite(e.bal));
+    const cb = circuitBreaker([...entries.map((e: any) => e.bal), bal]);
     if (cb) return { action: "blocked", reason: cb };
+    adapt = adaptTurbo(outcomesFrom(entries, bal));
   }
 
   const k1 = await loadGoldKlines({ interval: "1m" });
@@ -54,6 +57,7 @@ export async function mt5AutoTick() {
     const sig = turboSignal(c1);
     if (!sig?.side) return { action: "wait", reason: sig?.reason ?? "no_data" };
     side = sig.side;
+    if (adapt.blockSide === side) return { action: "wait", reason: `learn: ${adapt.note}` };
     // Smart bracket: the user's SL/TP points are maximums; real distances come from swings and nearby levels.
     const fb = turboBracket(side, price);
     const sb = smartBracket(side, price, c1, Number(ctl.sl_points ?? Math.abs(price - fb.stop)), Number(ctl.tp_points ?? Math.abs(fb.target - price)));
@@ -61,7 +65,9 @@ export async function mt5AutoTick() {
     b = sb; smartWhy = sb.why; ai = { confidence: "T" };
     const rr = Math.abs(sb.target - price) / Math.max(0.01, Math.abs(price - sb.stop));
     const strength = signalStrength(side, c1, rr);
+    if (strength < adapt.minStrength) return { action: "wait", reason: `learn: ${adapt.note}` };
     lot = dynamicLot(lot, strength); if (strength >= 3) smartWhy += ` | 💪 قوة ${strength}/4`;
+    if (adapt.note) smartWhy += ` | 🧠 ${adapt.note}`;
   } else {
     const k5 = await loadGoldKlines({ interval: "5m" });
     const sig = sniperLiteSignal(c1);
