@@ -10,8 +10,8 @@
 <!-- LOVABLE:END -->
 
 # Agent rules
-- Trade history is never truncated on insert; account reads paginate until exhausted, and src/lib/trade-history.ts shares outcome presentation — keeps records complete and labels consistent without changing execution reasons.
-- Pure trading logic (indicators, signals, risk) lives in src/lib/trading.ts with tests; server code imports it — keeps rules testable and shared with the UI.
+- Trade history is never truncated on insert; account reads paginate until exhausted, and src/lib/trade-history.ts shares outcome presentation.
+- Pure trading logic (indicators, signals, risk) lives in src/lib/trading.ts with tests; server code imports it.
 - Bot execution runs in authenticated server functions (src/functions/bot.functions.ts) — workers are stateless, no in-memory bot state.
 - Chart and paper-mode prices come from the live Binance public API (Testnet mode decides on Testnet prices to match its fills); paper balances live in bot_settings — user wants real prices with simulated trading.
 - API credentials table has no client grants; only server functions read it via admin client — secrets never reach the browser.
