@@ -19,3 +19,7 @@ it("normal rules when winning", () => {
 it("ignores small exits under $1.5 when pausing a side", () => {
   expect(adaptTurbo([{ side: "short", pnl: 3 }, { side: "short", pnl: -0.61 }, { side: "short", pnl: -0.21 }]).blockSide).toBeNull();
 });
+it("never learns from manual test trades or bot trades mixed with them", () => {
+  const outs = outcomesFrom([{ side: "short", bal: 1000 }, { side: "long", bal: 1002 }, { side: "long", bal: 0, manual: true }, { side: "short", bal: 0, manual: true }], 990);
+  expect(outs).toEqual([{ side: "short", pnl: 2 }]);
+});

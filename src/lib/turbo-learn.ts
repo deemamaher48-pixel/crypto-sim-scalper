@@ -6,9 +6,24 @@ export type Adapt = { blockSide: Side | null; minStrength: number; note: string 
 
 export const LEARN = { window: 6, sideLosses: 2, poorWinRate: 0.4, strictStrength: 3, minUsd: 1.5 } as const;
 
-/** Entries (side + balance at entry, oldest first) + current balance → closed outcomes. */
-export function outcomesFrom(entries: { side: Side; bal: number }[], current: number): Outcome[] {
-  return entries.map((e, i) => ({ side: e.side, pnl: +((entries[i + 1]?.bal ?? current) - e.bal).toFixed(2) }));
+/** Entries (side + balance at entry, oldest first) + current balance → closed bot outcomes.
+ *  Manual/test entries are never learned from, and a bot trade whose window contains a manual trade is skipped (its P/L would be mixed). */
+export function outcomesFrom(entries: { side: Side; bal: number; manual?: boolean }[], current: number): Outcome[] {
+  const out: Outcome[] = [];
+  entries.forEach((e, i) => {
+    if (e.manual) return;
+    const next = entries[i + 1];
+    if (next?.manual) return;
+    out.push({ side: e.side, pnl: +((next?.bal ?? current) - e.bal).toFixed(2) });
+  });
+  return out;
+}
+
+/** Clean bot outcomes → balance-like series for the circuit breaker (manual trades excluded). */
+export function botBalances(start: number, outs: Outcome[]): number[] {
+  const r = [start];
+  for (const o of outs) r.push(+(r[r.length - 1]! + o.pnl).toFixed(2));
+  return r;
 }
 
 /** Learns from the last trades: a side that lost twice in a row is paused; a poor win rate demands stronger signals. */
