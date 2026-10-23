@@ -80,7 +80,10 @@ async function tick() {
   let lastPnl: number | undefined;
   if (bal !== undefined) {
     // All executed entries today; manual/Telegram test trades are marked so learning and the breaker ignore them.
-    const { data: done } = await db.from("mt5_commands").select("action,comment").in("action", ["BUY", "SELL"]).eq("status", "executed").gte("created_at", day.toISOString()).order("created_at", { ascending: true });
+    // Manual breaker reset (user choice): only entries after the stored reset time count.
+    const { data: rst } = await db.from("mt5_rate_limits").select("window_start").eq("bucket", "breaker_reset").maybeSingle();
+    const since = rst?.window_start && new Date(rst.window_start) > day ? new Date(rst.window_start) : day;
+    const { data: done } = await db.from("mt5_commands").select("action,comment").in("action", ["BUY", "SELL"]).eq("status", "executed").gte("created_at", since.toISOString()).order("created_at", { ascending: true });
     const entries = (done ?? []).map((r: any) => {
       const manual = !String(r.comment ?? "").startsWith("auto");
       return { side: (r.action === "BUY" ? "long" : "short") as "long" | "short", bal: manual ? 0 : Number(/bal:(-?[\d.]+)/.exec(r.comment ?? "")?.[1]), manual };
@@ -163,7 +166,8 @@ async function tick() {
     b = { stop: price - d * slPts, target: price + d * tpPts };
     smartWhy = `${sig.reason} | ستوب ${slPts} هدف ${tpPts}`; ai = { confidence: sig.tag };
     const unsecured = positions.some((p) => !(p.sl > 0 && (p.type === "BUY" ? p.sl >= p.price_open : p.sl <= p.price_open)));
-    lot = scoreLot(lot, sig.score, unsecured); if (sig.score >= 2) smartWhy += ` | 💪 قوة ${sig.score}/3`;
+    void unsecured; // Lot fixed at control lot (user choice: no score-based size-up).
+    if (sig.score >= 2) smartWhy += ` | 💪 قوة ${sig.score}/3`;
     if (adapt.note) smartWhy += ` | 🧠 ${adapt.note}`;
     if (news) {
       const k5 = await loadGoldKlines({ interval: "5m" });
