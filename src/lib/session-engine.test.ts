@@ -33,3 +33,13 @@ describe("session engine", () => {
     expect(beTrigger("LONDON_MID")).toBe(2.5);
   });
 });
+
+import { engineTurbo as _et } from "./session-engine";
+describe("asia range fade", () => {
+  it("buys a bullish bounce off the Asia range floor", () => {
+    const bars = Array.from({ length: 60 }, (_, i) => { const o = 100 + Math.sin(i / 3) * 2; return { open: o, high: o + 0.6, low: o - 0.6, close: o + 0.1 }; });
+    bars.push({ open: 98.3, high: 99.0, low: 97.9, close: 98.9 });
+    const s = _et(bars, "ASIA", "short", { high: 102.5, low: 97.8 });
+    expect(s.side).toBe("long");
+  });
+});
