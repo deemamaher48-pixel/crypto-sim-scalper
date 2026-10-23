@@ -41,9 +41,16 @@ export function reversalSignal(m5: Bar[], m15: Bar[], h1: Bar[]): Reversal {
   const side = firm(m5);
   if (!side) return null;
   const opp = side === "long" ? "short" : "long";
-  // Anti-chase: never sell into an extreme oversold low / buy an extreme overbought top.
-  const r = rsiLast(m5.map((k) => k.close), 14);
-  if (r != null && ((side === "short" && r < 25) || (side === "long" && r > 75))) return null;
+  // Anti-chase: never sell into an oversold low / buy an overbought top.
+  const cl = m5.map((k) => k.close);
+  const r = rsiLast(cl, 14);
+  if (r != null && ((side === "short" && r < 35) || (side === "long" && r > 65))) return null;
+  // Anti-chase: skip when price is stretched far from 5m EMA21 (> 2× average range).
+  if (m5.length >= 22) {
+    const e21 = ema(cl, 21).at(-1)!, last = m5.slice(-14);
+    const avg = last.reduce((s, k) => s + (k.high - k.low), 0) / last.length;
+    if (avg > 0 && Math.abs(cl.at(-1)! - e21) > 2 * avg) return null;
+  }
   const t1 = tr(h1, 21, 50);
   if (t1 === opp) return null; // 5m must agree with (or at least not oppose) 1H
   const t4 = tr(toH4(h1), 9, 21);
