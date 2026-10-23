@@ -29,7 +29,7 @@ describe("session engine", () => {
     expect(scoreLot(0.01, 3, true)).toBe(0.01);
   });
   it("secures turbo faster in the NY overlap", () => {
-    expect(beTrigger("NY_OVERLAP")).toBe(0.9);
-    expect(beTrigger("LONDON_MID")).toBe(1.2);
+    expect(beTrigger("NY_OVERLAP")).toBe(2.5);
+    expect(beTrigger("LONDON_MID")).toBe(2.5);
   });
 });

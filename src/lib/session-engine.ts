@@ -7,7 +7,7 @@ export type Session = "ASIA" | "LONDON_OPEN" | "LONDON_MID" | "NY_OVERLAP" | "NY
 export type TimedBar = Bar & { time: number };
 export type Pivot = { P: number; R1: number; S1: number; R2: number; S2: number };
 
-export const ENGINE = { chaseAtr: 2.8, pullAtr: 0.25, minAdx: 18, minBody: 0.5, slMin: 1.2, slMax: 3.0, slPad: 0.3, tpAsia: 1.4, tpMain: 1.8, beNy: 0.9, beMain: 1.2 } as const;
+export const ENGINE = { chaseAtr: 2.8, pullAtr: 0.25, minAdx: 18, minBody: 0.5, slMin: 1.2, slMax: 3.0, slPad: 0.3, tpAsia: 1.4, tpMain: 1.8, beNy: 2.5, beMain: 2.5 } as const;
 
 export function sessionAt(ms: number): Session {
   const h = new Date(ms).getUTCHours();
