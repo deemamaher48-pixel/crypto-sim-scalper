@@ -13,3 +13,11 @@ it("secures a swing at +4 points", () => {
   expect(swingManage({ type: "BUY", price_open: 4100, sl: 4094 }, 4104.1)).toBe("BREAKEVEN");
   expect(swingManage({ type: "BUY", price_open: 4100, sl: 4094 }, 4102)).toBe("hold");
 });
+it("swing targets 6-12 points with stop 3.5-5 and R:R 2", async () => {
+  const { SWING } = await import("./swing");
+  expect([SWING.minSl, SWING.maxSl, SWING.minTp, SWING.maxTp, SWING.minRr]).toEqual([3.5, 5, 6, 12, 2]);
+});
+it("a 3.5-point stop counts as swing, a 3-point turbo stop does not", () => {
+  expect(isSwingPos({ price_open: 4100, sl: 4096.5 })).toBe(true);
+  expect(isSwingPos({ price_open: 4100, sl: 4097 })).toBe(false);
+});

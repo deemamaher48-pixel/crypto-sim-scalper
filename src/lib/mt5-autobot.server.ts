@@ -147,10 +147,16 @@ async function tick() {
     const swingPos = positions.find((p) => isSwingPos(p));
     let sig: any = engineTurbo(c1, session, turboBias, asianRange(ms(m15), now), null);
     const { m5Gate } = await import("@/lib/m5-structure");
-    const { htfGate } = await import("@/lib/htf-gate");
+    const { htfGate, counterTrendGuard } = await import("@/lib/htf-gate");
     const { needsHeavyGate } = await import("@/lib/heavy-gate");
+    const { firm } = await import("@/lib/reversal");
+    const { rsi } = await import("@/lib/trading");
     const heavy = sig.side ? needsHeavyGate(lastPnl, m5rows, sig.side) : false;
     let blocked = sig.side ? (heavy ? (m5Gate(m5rows, sig.side) ?? htfGate(h1, sig.side)) : null) : sig.reason;
+    if (!blocked && sig.side && m5rows.length > 20) {
+      const r5 = rsi(m5rows.map((k: any) => k.close), 14).at(-1) ?? 50;
+      blocked = counterTrendGuard(h1, m5rows, sig.side, r5, firm(m5rows));
+    }
     // Reversal engine (user rule): firm 5m + 1H = quick scalp; firm 15m body + 4H = strong. Lets the bot flip after a stop.
     if (blocked) {
       const { reversalSignal } = await import("@/lib/reversal");
