@@ -7,7 +7,7 @@ export type Session = "ASIA" | "LONDON_OPEN" | "LONDON_MID" | "NY_OVERLAP" | "NY
 export type TimedBar = Bar & { time: number };
 export type Pivot = { P: number; R1: number; S1: number; R2: number; S2: number };
 
-export const ENGINE = { chaseAtr: 2.8, pullAtr: 0.25, minAdx: 18, minBody: 0.5, slMin: 1.2, slMax: 3.0, slPad: 0.3, tpAsia: 1.4, tpMain: 1.8, beNy: 2.5, beMain: 2.5 } as const;
+export const ENGINE = { chaseAtr: 2.8, pullAtr: 0.35, minAdx: 15, minBody: 0.5, slMin: 1.2, slMax: 3.0, slPad: 0.3, tpAsia: 1.2, tpMain: 1.8, beNy: 2.5, beMain: 2.5, asiaBoxAtr: 2, asiaEdge: 0.2 } as const;
 
 export function sessionAt(ms: number): Session {
   const h = new Date(ms).getUTCHours();
@@ -89,14 +89,20 @@ export function engineTurbo(c1: Bar[], session: Session, bias: Side, asia: { hig
   if (session === "ASIA") {
     if (bias === "long" && up && pullBuy && bull && r < 68) return pick("long", 1, "TA", "ارتداد EMA فوق البيفوت");
     if (bias === "short" && down && pullSell && bear && r > 32) return pick("short", 1, "TA", "ارتداد EMA تحت البيفوت");
-    return { side: null, reason: `آسيا: ننتظر ارتداد مع البيفوت (${bias === "long" ? "شراء" : "بيع"} فقط)` };
+    // Range fade: Asia gold mostly ranges — buy the floor, sell the ceiling (needs a real box ≥ 2 ATR).
+    if (asia && asia.high - asia.low >= ENGINE.asiaBoxAtr * a) {
+      const w = asia.high - asia.low, edge = w * ENGINE.asiaEdge;
+      if (c.low <= asia.low + edge && bull && r < 45 && c.close > asia.low) return pick("long", 1, "TR", "ارتداد من قاع نطاق آسيا");
+      if (c.high >= asia.high - edge && bear && r > 55 && c.close < asia.high) return pick("short", 1, "TR", "ارتداد من قمة نطاق آسيا");
+    }
+    return { side: null, reason: `آسيا: ننتظر ارتداد من حدود النطاق أو مع الترند` };
   }
   if (session === "LONDON_OPEN" && asia) {
     if (bias === "long" && c.close > asia.high && bull && r < 75) return pick("long", 3, "TL", "كسر قمة آسيا");
     if (bias === "short" && c.close < asia.low && bear && r > 25) return pick("short", 3, "TL", "كسر قاع آسيا");
   }
   if (!(x >= ENGINE.minAdx)) return { side: null, reason: `ADX ضعيف (${Number.isFinite(x) ? x.toFixed(0) : "-"})` };
-  const strong = x > 25 && session === "NY_OVERLAP" ? 3 : 2;
+  const strong = x > 25 && (session === "NY_OVERLAP" || session === "LONDON_OPEN") ? 3 : 2;
   if (bias === "long" && up && (pullBuy || microUp) && bull) return pick("long", strong, "TT", microUp ? "كسر قمة مصغر مع الترند" : "تصحيح مرن مع الترند");
   if (bias === "short" && down && (pullSell || microDn) && bear) return pick("short", strong, "TT", microDn ? "كسر قاع مصغر مع الترند" : "تصحيح مرن مع الترند");
   if (bias === "long" ? !up : !down) return { side: null, reason: `البيفوت ${bias === "long" ? "شراء" : "بيع"} والترند الدقيقة عكسه` };
