@@ -25,7 +25,7 @@
 - MT5 open positions are managed by the pure src/lib/mt5-manager.ts (break-even, half close, smart exit) from broker snapshot profit, one command per ticket per 2 min — broker numbers stay the truth and rules stay testable.
 - MT5 TURBO entries use src/lib/smart-bracket.ts: user SL/TP points are maximums, real distances come from recent swings, ATR and the nearest level; poor reward skips the entry — keeps stops chart-based, not fixed. TURBO signals only trade with the EMA21/50 trend after a pullback to EMA9, and size up (max 0.02) only at full strength; chop filters (EMA gap, slope, ADX) and a daily circuit breaker (src/lib/circuit-breaker.ts, balances tagged on entries) gate entries — avoids counter-trend, chasing and loss streaks.
 - TURBO self-learning lives in pure src/lib/turbo-learn.ts: today's real bot outcomes (bal: tags) pause a side after 2 straight losses and demand stronger signals on a poor win rate; manual/Telegram trades (non-"auto" comments) and bot trades overlapping them are excluded from learning, the breaker and the heavy gate — user tests must not teach the bot.
-- MT5 runs two slots: one SWING (pure src/lib/swing.ts: 1H EMA50/200 trend + 15m BOS/EMA21 pullback, AI-approved, comment "auto SW") and one TURBO; swing positions (stop ≥3.5 pts) get their own management and EA trail — turbo rules would cut swings early.
+- MT5 runs two slots: one SWING (pure src/lib/swing.ts: 1H EMA50/200 trend + 15m BOS/EMA21 pullback, AI-approved, comment "auto SW") and one TURBO; swing positions (stop ≥3.25 pts; turbo stops ≤3) get their own management and EA trail — turbo rules would cut swings early.
 - Circuit breaker counts losses ≥ $1.5; stop reason posts to Telegram once per change (mt5_status id=2) — user always knows why.
 - news-window.ts is off in mt5-autobot (NEWS_GUARD=false, user choice).
 - TURBO 5m-structure (m5-structure.ts) and 1H/4H (htf-gate.ts) gates apply only after a stop loss or against firm opposite 5m momentum (pure src/lib/heavy-gate.ts) — user rule: no permanent freeze.
@@ -33,3 +33,5 @@
 - MT5 TURBO reversal engine (pure src/lib/reversal.ts): when the normal turbo entry is blocked, a firm 5m candle not opposed by 1H opens a quick scalp, plus a firm 15m body not opposed by 4H a stronger one — lets the bot flip after a stop instead of idling; skips extreme 5m RSI (<25 sell, >75 buy) only.
 - Nightly Telegram report: pure daily-report.ts via /api/public/jobs/daily-report (21:00 UTC).
 - Nightly report P&L per trade uses EA snapshot "deals" (broker net per ticket, pure buildReportTrades), else balance-diff estimate — broker is truth.
+
+- TURBO counter-trend guard (counterTrendGuard in src/lib/htf-gate.ts) is always on: against the 1H EMA21/50 trend it needs 5m RSI extreme (<30/>70) or a firm 5m candle; with-trend trades untouched — blocks dip-catching without choking turbo.
