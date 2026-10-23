@@ -1,6 +1,6 @@
 import { inRolloverWindow } from "@/lib/smart-scalp";
 import { sniperLiteBracket, sniperLiteSignal } from "@/lib/sniper-lite";
-import { asianRange, dailyPivot, engineTurbo, pivotBias, scoreLot, sessionAt } from "@/lib/session-engine";
+import { asianRange, dailyPivot, engineTurbo, pivotBias, sessionAt } from "@/lib/session-engine";
 import { aiReviewTrade } from "@/lib/ai-analyst.server";
 import { loadGoldKlines } from "@/functions/gold.functions";
 import { ptsTag } from "@/lib/mt5-points";
