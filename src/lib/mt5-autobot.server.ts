@@ -19,10 +19,13 @@ const BLOCK_AR: Record<string, string> = {
 /** Tell Telegram once whenever the bot's stop reason changes (and once when it resumes). */
 async function reportState(db: any, reason: string | null) {
   try {
-    const { data } = await db.from("mt5_status").select("payload").eq("id", 2).maybeSingle();
-    const last = data?.payload?.block ?? null;
+    // Last stop reason is kept as one mt5_rate_limits row "block:<reason>" (mt5_status only allows id=1).
+    const { data } = await db.from("mt5_rate_limits").select("bucket").like("bucket", "block:%").limit(1);
+    const last = data?.[0] ? String(data[0].bucket).slice(6) || null : null;
     if (last === reason) return;
-    await db.from("mt5_status").upsert({ id: 2, payload: { block: reason }, updated_at: new Date().toISOString() });
+    await db.from("mt5_rate_limits").delete().like("bucket", "block:%");
+    const { error } = await db.from("mt5_rate_limits").insert({ bucket: `block:${reason ?? ""}`, hits: 0, window_start: new Date().toISOString() });
+    if (error) { console.error("reportState save", error); return; } // never notify if state can't be saved (no spam)
     const { notifyOwners } = await import("@/lib/mt5-telegram.server");
     await notifyOwners(reason ? `⏸️ البوت وقّف الدخول التلقائي\n${BLOCK_AR[reason] ?? reason}` : "▶️ البوت رجع يدوّر على صفقات تلقائياً");
   } catch (e) { console.error("reportState", e); }
