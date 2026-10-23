@@ -31,7 +31,6 @@
 - TURBO 5m-structure (m5-structure.ts) and 1H/4H (htf-gate.ts) gates apply only after a stop loss or against firm opposite 5m momentum (pure src/lib/heavy-gate.ts) — user rule: no permanent freeze.
 - MT5 TURBO entries come from the session engine (pure src/lib/session-engine.ts): UTC sessions, direction from the 1m EMA21/50 trend (daily pivot no longer gates turbo, user choice; swing still uses it), Asia-range breakout at London open, flexible EMA9/21 pullback or micro-breakout; score sets lot (max 0.03, base while another trade is unsecured) and turbo break-even is session-aware — replaces the old turboSignal/smart-bracket gate for entries.
 - MT5 TURBO reversal engine (pure src/lib/reversal.ts): when the normal turbo entry is blocked, a firm 5m candle not opposed by 1H opens a quick scalp, plus a firm 15m body not opposed by 4H a stronger one — lets the bot flip after a stop instead of idling; skips extreme 5m RSI (<25 sell, >75 buy) only.
-- Nightly Telegram report: pure daily-report.ts via /api/public/jobs/daily-report (21:00 UTC).
-- Nightly report P&L per trade uses EA snapshot "deals" (broker net per ticket, pure buildReportTrades), else balance-diff estimate — broker is truth.
+- Nightly Telegram report (pure daily-report.ts, /api/public/jobs/daily-report 21:00 UTC) takes per-trade P&L from EA snapshot deals, else balance-diff estimate — broker is truth.
 
-- TURBO counter-trend guard (counterTrendGuard in src/lib/htf-gate.ts) is always on: against the 1H EMA21/50 trend it needs 5m RSI extreme (<30/>70) or a firm 5m candle; with-trend trades untouched — blocks dip-catching without choking turbo.
+- TURBO counterTrendGuard (htf-gate.ts) always on: vs 1H trend needs 5m RSI <30/>70 or firm 5m candle — stops dip-catching.
