@@ -3,7 +3,7 @@
 import { adx, atr, ema, rsi, type Side } from "@/lib/trading";
 import type { Bar } from "@/lib/smart-scalp";
 
-export const SWING = { minSl: 4, maxSl: 7, minTp: 12, maxTp: 25, minRr: 2.5, minAdx: 18, look: 12, longRsi: [50, 66], shortRsi: [34, 50], beUsdPts: 4, lockStartPts: 8, lockPts: 4 } as const;
+export const SWING = { minSl: 3.5, maxSl: 5, minTp: 6, maxTp: 12, minRr: 2.0, minAdx: 18, look: 12, longRsi: [42, 70], shortRsi: [30, 58], beUsdPts: 4, lockStartPts: 8, lockPts: 4, posMinSl: 3.25 } as const;
 
 export type SwingSignal = { side: Side; stop: number; target: number; reason: string } | { side: null; reason: string };
 
@@ -42,9 +42,11 @@ export function swingSignal(m15: Bar[], h1: Bar[], price: number): SwingSignal {
   // Nearest 1H level in our direction caps the target.
   const hiH = h1.slice(-48).map((k) => (long ? k.high : k.low)).filter((v) => (long ? v > price + 1 : v < price - 1));
   const level = hiH.length ? (long ? Math.min(...hiH) : Math.max(...hiH)) : NaN;
+  // The nearest 1H level becomes the target (just before it) instead of cancelling the trade.
   let tpDist = Math.min(SWING.maxTp, slDist * 3);
   if (Number.isFinite(level)) tpDist = Math.min(tpDist, Math.abs(level - price) - 0.5);
-  if (tpDist < SWING.minTp || tpDist / slDist < SWING.minRr) return { side: null, reason: "سوينغ: الهدف قريب من مقاومة — عائد ضعيف" };
+  tpDist = +tpDist.toFixed(2);
+  if (tpDist < SWING.minTp || tpDist / slDist < SWING.minRr) return { side: null, reason: "سوينغ: المقاومة قريبة كتير — عائد ضعيف" };
   return {
     side: trend,
     stop: long ? price - slDist : price + slDist,
@@ -53,10 +55,10 @@ export function swingSignal(m15: Bar[], h1: Bar[], price: number): SwingSignal {
   };
 }
 
-/** A position is a swing when its stop sits at least SWING.minSl - 0.5 points away (turbo stops are ≤3). */
+/** A position is a swing when its stop sits at least SWING.posMinSl points away (turbo stops are ≤3). */
 export function isSwingPos(p: { price_open: number; sl: number }, entrySlDist?: number): boolean {
   const d = entrySlDist ?? (p.sl > 0 ? Math.abs(p.price_open - p.sl) : 0);
-  return d >= SWING.minSl - 0.5;
+  return d >= SWING.posMinSl;
 }
 
 /** Swing management: break-even at +4, then lock +4 once +8 is reached. */

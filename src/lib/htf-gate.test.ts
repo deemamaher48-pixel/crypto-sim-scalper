@@ -12,3 +12,13 @@ test("blocks sell when 1H and 4H are rising", () => {
   expect(htfGate(bars(1), "short")).not.toBeNull();
   expect(htfGate(bars(1), "long")).toBeNull();
 });
+
+import { counterTrendGuard } from "./htf-gate";
+test("blocks a counter-trend buy on falling 1H unless 5m RSI < 30 or firm 5m buy", () => {
+  expect(counterTrendGuard(bars(-1), [], "long", 45, null)).not.toBeNull();
+  expect(counterTrendGuard(bars(-1), [], "long", 28, null)).toBeNull();
+  expect(counterTrendGuard(bars(-1), [], "long", 45, "long")).toBeNull();
+});
+test("never touches with-trend turbo trades", () => {
+  expect(counterTrendGuard(bars(-1), [], "short", 20, null)).toBeNull();
+});
